@@ -63,14 +63,16 @@ eval pre a@(chan:x:xs) = do
         sameChn = "PRIVMSG "++chan++ " :"
     case (auth,x) of
       (True, ":join")      -> if null xs
-                        then io $ write h sameChn "No Channels provided for join"
-                        else let chan = head xs
-                                 key  = if null $ tail xs
-                                          then []
-                                          else head $ tail xs
-                             in do
-                               io $ write h sameChn ("Joining Channel "++chan)
-                               io $ write h "JOIN" (unwords [chan,key])
+                              then io $ write h sameChn "No Channels provided for join"
+                              else let chan = head xs
+                                       key  = if null $ tail xs
+                                                then []
+                                                else head $ tail xs
+                                   in do
+                                     io $ write h sameChn ("Joining Channel "++chan)
+                                     io $ write h "JOIN" (unwords [chan,key])
+      (True, ":part")      -> io $ write h ("PART "++chan) []
+      (True, ":quit")      -> io $ write h "QUIT" "Quitting per order of: "
       (True, ":put")       -> let newBuff = b ++ (unwords xs) in do put (bs { buffer = newBuff}) >> (io $ write h sameChn newBuff)
       (True, ":show")      -> io $ write h sameChn b
       (True, ":delete")    -> do put (bs {buffer = []} ) >> (io $ write h sameChn "Buffer empty")
@@ -81,7 +83,7 @@ eval pre a@(chan:x:xs) = do
                              in do
                                put (bs { masters = newList })
                                io $ write h sameChn ("Added Master "++newMast)
-      (_,":help")           -> io $ write h sameChn "who are you to ask me for help"
+      (_,":help")          -> io $ write h sameChn "who are you to ask me for help"
       _                    -> io $ putStrLn $ ("Message "++pre++x)
 
 io :: IO a -> Bot a
