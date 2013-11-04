@@ -1,0 +1,30 @@
+(c)Any use of this software must adhere to the rules under the GPL
+
+
+This Software provides a basic stateful IRC bot written in the spare
+time of a broke and bored college Student. Keep that in mind as you
+poke around my code. I am open for pointers and suggestion.
+
+Current Commands:
+
+  Priviledged (the user issuing the command is a part of authorized nick list)
+
+    join channel <key>
+      joins a channel and uses the optional key if provided
+
+    put <string>
+      appends a string to the buffer saved in the bot's state
+
+    show
+      outputs the current buffer saved in state to the current channel
+
+    delete
+      delete the contents of said stored buffer
+
+    addMaster nick
+      adds a nick to the set of known masters
+
+  UnPriviledged (Anyone)
+
+    help
+      display some help information
