@@ -23,3 +23,5 @@ parse x
                        in IsPRIVMSG nic usr source channel message
     | otherwise      = UnknownLine x
 
+
+makeMessage nic usr hst chn mes = ":"++nic++"!"++usr++"@"++hst++" PRIVMSG "++chn++" :"++mes
