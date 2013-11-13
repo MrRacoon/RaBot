@@ -53,7 +53,7 @@ tryCommand message command
     copesetic  = authorized && triggered && stated
     authorized = (nick message) `elem` (auth command) || null (auth command) || (nick message) == owner
     triggered  = all (flip trig (mess message)) (trigger command)
-    stated     = checkState (mess message) (state command)
+    stated     = checkState (actv message) (state command)
 
 
 trig :: C_Trigger -> (String -> Bool)
@@ -71,10 +71,10 @@ resolveArgs message (WordAfter r)     = let (_,_,a) = (mess message) =~ r :: (St
 resolveArgs message (AllWordsAfter r) = let (_,_,a) = (mess message) =~ r :: (String, String, String)
                                         in a
 
-checkState _ Never  = False
-checkState m Active = let fw = head $ words m
-                      in  fw == (botNick ++ ":") || fw == ">>="
-checkState _ _      = True
+checkState _    Never  = False
+checkState _    Always = True
+checkState True Active = True
+checkState _    _      = False
 
 
 readInCommands = do

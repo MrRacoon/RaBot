@@ -1,5 +1,6 @@
 module Messaging where
 
+import Secrets
 import Text.Regex.TDFA
 
 data Message = UnknownLine String
@@ -8,7 +9,8 @@ data Message = UnknownLine String
                          , user :: String
                          , host :: String
                          , chan :: String
-                         , mess :: String }
+                         , mess :: String
+                         , actv :: Bool  }
     deriving Show
 
 parse :: String -> Message
@@ -20,7 +22,10 @@ parse x
                            (c,_,source)  = b =~ "@"         :: (String, String, String)
                            (d,_,usr)     = c =~ "!"         :: (String, String, String)
                            nic           = tail d
-                       in IsPRIVMSG nic usr source channel message
+                           (_,m,p)       = message =~ ("("++botNick++": |"++attChar++" )") :: (String, String, String)
+                       in case null m of
+                            True  -> IsPRIVMSG nic usr source channel message False
+                            False -> IsPRIVMSG nic usr source channel p True
     | otherwise      = UnknownLine x
 
 
@@ -29,4 +34,7 @@ makeMessage nic usr hst chn mes = ":"++nic++"!"++usr++"@"++hst++" PRIVMSG "++chn
 
 testMessage  = parse $ makeMessage "Racoon" "suthere" "somewhere.here.not.yeah" "#BatShit" "Hey Pst whatsup doc?"
 testMessage2 = parse $ makeMessage "Racoon" "suthere" "somewhere.here.not.yeah" "#BatShit" "Hey whatsup doc?"
+testMessage3 = parse $ makeMessage "Racoon" "suthere" "somewhere.here.not.yeah" "#BatShit" "RaBot: Hey Pst whatsup doc?"
+testMessage4 = parse $ makeMessage "Racoon" "suthere" "somewhere.here.not.yeah" "#BatShit" ">>= Hey Pst whatsup doc?"
+
 
