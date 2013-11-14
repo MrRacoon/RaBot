@@ -3,6 +3,10 @@ module Messaging where
 import Secrets
 import Text.Regex.TDFA
 
+-- ------------------------------------------------------------------------------------------------------------------
+-- Message
+-- The struct dictates what each line will filter into
+--    IsPRIVMSG is most important, as that will go on to initiate commands
 data Message = UnknownLine String
              | IsPING String
              | IsPRIVMSG { nick :: String
@@ -28,9 +32,10 @@ parse x
                             False -> IsPRIVMSG nic usr source channel p True
     | otherwise      = UnknownLine x
 
+-- ------------------------------------------------------------------------------------------------------------------
 
+makeMessage :: String -> String -> String -> String -> String -> String
 makeMessage nic usr hst chn mes = ":"++nic++"!"++usr++"@"++hst++" PRIVMSG "++chn++" :"++mes
-
 
 testMessage  = parse $ makeMessage "Racoon" "suthere" "somewhere.here.not.yeah" "#BatShit" "Hey Pst whatsup doc?"
 testMessage2 = parse $ makeMessage "Racoon" "suthere" "somewhere.here.not.yeah" "#BatShit" "Hey whatsup doc?"

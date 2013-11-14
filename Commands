@@ -4,11 +4,10 @@
 ; Format is pretty strict, basically you are constructing a list of commands
 ;  to be read in as: [Command]
 
-[
 Command { state   = Active
         , auth    = []
         , usage   = ">>= join <channel>"
         , desc    = "Command to join a channel"
         , trigger = [WordPresent "JOIN"]
         , action  = [Respond [Literal "JOIN", WordAfter "JOIN"] To_Server ] }
-]
+

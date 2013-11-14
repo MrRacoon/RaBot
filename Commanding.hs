@@ -49,6 +49,7 @@ data C_State = Active   -- Active state involves the issuer talking directly to 
              | Never    -- The bot will never in a million years ever issue the command, it may as well not even exist
     deriving (Show,Read)
 
+checkState :: Bool -> C_State -> Bool
 checkState _    Never  = False
 checkState _    Always = True
 checkState True Active = True
@@ -89,6 +90,7 @@ data Argument = Literal String           -- Stands for the literal string
               | AllWordsAfter Regex_Text -- Return everything after the Regex
     deriving (Show,Read)
 
+resolveArgs :: Message -> Argument -> String
 resolveArgs message (Literal s)       = s
 resolveArgs message (WordAfter r)     = let (_,_,a) = (mess message) =~ r :: (String, String, String)
                                         in head $ words a
@@ -105,6 +107,7 @@ data Destination = To_Current        -- The destination is to the current window
                  | To_Server         -- The destination is no where in particular aside from the server itself RAW
     deriving (Show,Read)
 
+makeDestination :: Message -> Destination -> String
 makeDestination message To_Current = chan message
 makeDestination _       To_Server  = []
 
@@ -116,21 +119,43 @@ makeDestination _       To_Server  = []
 data BotAction = SayToServer String String
     deriving (Show,Read)
 
+makeAction :: Message -> C_Action -> BotAction
 makeAction message (Respond args dest) = SayToServer (makeDestination message dest) (unwords $ map (resolveArgs message) args)
 
 -- ------------------------------------------------------------------------------------------------------------------
 -- Fileparsing of commands
 -- Read in the commands from the designated file
 
+readInCommands :: IO (Either String [Command])
 readInCommands = do
-    file <- readFile "Commands"
+    file <- readFile commandFile
     let clean  = filter ((/=';') . head) $ filter (not . null) $ lines file
         cleanr = unwords $ words $ unwords clean
         coms   = read cleanr :: [Command]
-    return coms
+    return $ case getCommands cleanr of
+        Nothing -> Left "There was an Error Parsing the Command File"
+        Just cs -> Right cs
+
+reloadCommands :: [Command] -> IO (Either [Command] [Command])
+reloadCommands last = do
+    rel <- readInCommands
+    return $ case rel of
+      Right new -> Right new
+      Left  _   -> Left last
+
+getCommands :: String -> Maybe [Command]
+getCommands = accumulateCommands []
+
+accumulateCommands :: [Command] -> String -> Maybe [Command]
+accumulateCommands save []   = Just (save)
+accumulateCommands save next = case reads next :: [(Command,String)] of
+                                 [(c,[])]  -> Just (c:save)
+                                 [(c,r)]   -> accumulateCommands (c:save) r
+                                 []        -> Nothing
 
 -- ------------------------------------------------------------------------------------------------------------------
 -- Examples
+commandExample1 :: Command
 commandExample1 = Command { state   = Active
                           , auth    = ["Racoon"]
                           , usage   = "say 'Pst'"
