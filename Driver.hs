@@ -1,5 +1,6 @@
 module Driver where
 
+import Commanding
 import Control.Monad
 import Control.Monad.Trans.State
 import Control.Monad.IO.Class
@@ -22,6 +23,7 @@ data BotState = BotState { server   :: String
                          , channels :: String
                          , nickname :: String
                          , masters  :: [String]
+                         , commands :: [Command]
                          , buffer   :: String }
           deriving (Show)
 
@@ -31,13 +33,15 @@ type Bot = StateT BotState IO
   -- Drivers
   --
 main = do
+      coms <- readInCommands
       h <- connectTo botServer (PortNumber (fromIntegral botPort))
       hSetBuffering h NoBuffering
       write h "NICK" botNick
       write h "USER" (botNick++" 0 * :"++botDesc)
       write h "JOIN" initChan
-      let bot = BotState botServer botPort h initChan botNick initMasters []
-      runStateT listen bot
+      case coms of
+          Nothing   -> error "Could not parse the command File...Exiting."
+          Just coms -> runStateT listen $ BotState botServer botPort h initChan botNick initMasters coms []
 
 write :: Handle -> String -> String -> IO ()
 write h s t = do
@@ -50,51 +54,27 @@ listen  = forever $ do
       let h = handle bs
       line <- io $ hGetLine h
       let parsed = parse line
-      case parsed of
-        IsPING s                      -> io $ write h "PONG" s
-        IsPRIVMSG nic usr hst chn mes -> eval nic usr hst chn mes
-        UnknownLine l                 -> io $ putStrLn $ ("NOTHING: "++l)
+          coms   = parseCommands parsed (commands bs)
+      mapM evalCommand coms
   where
       forever a = do a; forever a
 
-eval nic usr hst chn mes = do
-    bs <- get
-    let (h,b,m) = (handle bs, buffer bs,masters bs)
-        auth    = elem nic m
-        sameChn = "PRIVMSG "++chn++ " :"
-        (x:xs)  = words mes
-    case (auth,x) of
-      (True, "join")      -> if null xs
-                              then say chn "No Channels provided for join"
-                              else let chan = head xs
-                                       key  = if null $ tail xs
-                                                then []
-                                                else head $ tail xs
-                                   in do
-                                     say chn ("Joining Channel "++chan)
-                                     io $ write h "JOIN" (unwords [chan,key])
-      (True, "part")      -> io $ write h ("PART "++chn) []
-      (True, "quit")      -> io $ write h "QUIT" "Quitting per order of: "
-      (True, "put")       -> let newBuff = b ++ (unwords xs) in do put (bs { buffer = newBuff}) >> (io $ write h sameChn newBuff)
-      (True, "show")      -> io $ write h sameChn b
-      (True, "delete")    -> do put (bs {buffer = []} ) >> (io $ write h sameChn "Buffer empty")
-      (True, "addMaster") -> if null xs
-                        then io $ write h sameChn "no args" 
-                        else let newMast = (head xs)
-                                 newList = newMast : m
-                             in do
-                               put (bs { masters = newList })
-                               io $ write h sameChn ("Added Master "++newMast)
-      (_,"auth")          -> say chn $ unwords m
-      (_,"help")          -> io $ write h sameChn "who are you to ask me for help"
-      _                   -> io $ putStrLn ("Message: "++(makeMessage nic usr hst chn mes))
+evalCommand (SayToServer chan mess) = say chan mess
+evalCommand (SayToTerm str)         = io $ putStrLn str
+evalCommand (Reload chan)           = do
+      bs  <- get
+      new <- io $ reloadCommands (commands bs)
+      case new of
+        Right c -> do say chan "Successfully reloaded :)" >> put (bs {commands = c})
+        Left  c -> do say chan "Reload Failed :(" >> put (bs {commands = c})
 
 say :: String -> String -> StateT BotState IO b
 say chn mes = do
     bs <- get
     let h = handle bs
-    io $ printf    "> %s :%s\n" chn mes
-    io $ hPrintf h "PRIVMSG %s :%s\r\n" chn mes
+    case chn of
+        [] -> io $ hPrintf h "%s\r\n" mes
+        _  -> io $ hPrintf h "PRIVMSG %s :%s\r\n" chn mes
 
 io :: IO a -> Bot a
 io = liftIO

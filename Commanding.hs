@@ -26,10 +26,17 @@ data Command = Command { state   :: C_State      -- state that the command is in
                        , action  :: [C_Action] } -- What the command will do
     deriving (Show,Read)
 
-tryCommand :: Message -> Command -> Maybe [BotAction]
+--parseCommands :: Message -> [Command] -> Maybe [BotAction]
+parseCommands (IsPING server) = const [SayToServer "" ("PONG :"++server), SayToTerm ("Ponged: "++server)]
+parseCommands (UnknownLine l) = const [SayToTerm l]
+parseCommands mess = ([SayToTerm (show mess)] ++) . concatMap (tryCommand mess)
+
+
+tryCommand :: Message -> Command -> [BotAction]
+tryCommand (IsPING server) _ = [SayToServer "" ("PONG"++server)]
 tryCommand message command
-    | copesetic = Just $ map (makeAction message) (action command)
-    | otherwise = Nothing
+    | copesetic = map (makeAction message) (action command)
+    | otherwise = []
   where
     copesetic  = authorized && triggered && stated
     authorized = (nick message) `elem` (auth command) || null (auth command) || (nick message) == owner
@@ -50,10 +57,11 @@ data C_State = Active   -- Active state involves the issuer talking directly to 
     deriving (Show,Read)
 
 checkState :: Bool -> C_State -> Bool
-checkState _    Never  = False
-checkState _    Always = True
-checkState True Active = True
-checkState _    _      = False
+checkState _     Never   = False
+checkState _     Always  = True
+checkState True  Active  = True
+checkState False Passive = True
+checkState _    _        = False
 
 -- ------------------------------------------------------------------------------------------------------------------
 -- Triggers
@@ -76,6 +84,8 @@ trig (WordPresent w) = (elem w) . words
 --                and the response will land in the channel specified by the Destination
 --
 data C_Action = Respond [Argument] Destination -- Respond with the string at the channel specified by destination
+              | JoinChannel Argument Argument  -- Join the matched Channel with the matched Key
+              | ReloadCommands                 -- Command to Reload the commands of the Bot
     deriving (Show,Read)
 
 -- ------------------------------------------------------------------------------------------------------------------
@@ -85,17 +95,23 @@ data C_Action = Respond [Argument] Destination -- Respond with the string at the
 --    WordAfter     -> Replaces itself with the word Directly following the Regex
 --    AllWordsAfter -> Is replaced By all of the text that comes after the matching string
 --
-data Argument = Literal String           -- Stands for the literal string
+data Argument = NULL                     -- For those actions that take optional arguments
+              | Literal String           -- Stands for the literal string
               | WordAfter Regex_Text     -- return the first word after some regex
               | AllWordsAfter Regex_Text -- Return everything after the Regex
+              | Nickname                 -- resolve the Nickname of the sender
+              | Username                 -- Resolve the Username of the user
     deriving (Show,Read)
 
-resolveArgs :: Message -> Argument -> String
-resolveArgs message (Literal s)       = s
-resolveArgs message (WordAfter r)     = let (_,_,a) = (mess message) =~ r :: (String, String, String)
+resolveArg :: Message -> Argument -> String
+resolveArg message (Literal s)       = s
+resolveArg message (WordAfter r)     = let (_,_,a) = (mess message) =~ r :: (String, String, String)
                                         in head $ words a
-resolveArgs message (AllWordsAfter r) = let (_,_,a) = (mess message) =~ r :: (String, String, String)
+resolveArg message (AllWordsAfter r) = let (_,_,a) = (mess message) =~ r :: (String, String, String)
                                         in a
+resolveArg message Nickname          = nick message
+resolveArg message Username          = user message
+resolveArg _       NULL              = []
 
 -- ------------------------------------------------------------------------------------------------------------------
 -- Destination
@@ -103,13 +119,15 @@ resolveArgs message (AllWordsAfter r) = let (_,_,a) = (mess message) =~ r :: (St
 --    To_Current -> Sends the message to the current window, in which the IRC line originated
 --    To_Server  -> Sends a message to the server with no Channel used as a Destination
 --
-data Destination = To_Current        -- The destination is to the current window in which some essage was recieved
-                 | To_Server         -- The destination is no where in particular aside from the server itself RAW
+data Destination = To_Current        -- current window in which some essage was recieved
+                 | To_Server         -- no where in particular aside from the server itself RAW
+                 | To_Channel String -- A specific destination
     deriving (Show,Read)
 
 makeDestination :: Message -> Destination -> String
-makeDestination message To_Current = chan message
-makeDestination _       To_Server  = []
+makeDestination message To_Current     = chan message
+makeDestination _       To_Server      = []
+makeDestination _       (To_Channel s) = s
 
 -- ------------------------------------------------------------------------------------------------------------------
 -- The BotActions are what the module will strive to return to the calling program
@@ -117,31 +135,33 @@ makeDestination _       To_Server  = []
 --    SayToServer -> Send a line ot the server
 --
 data BotAction = SayToServer String String
+               | SayToTerm String
+               | Reload String
     deriving (Show,Read)
 
 makeAction :: Message -> C_Action -> BotAction
-makeAction message (Respond args dest) = SayToServer (makeDestination message dest) (unwords $ map (resolveArgs message) args)
+makeAction message (Respond args dest) = SayToServer (makeDestination message dest) (unwords $ map (resolveArg message) args)
+makeAction message (JoinChannel ch k)  = SayToServer "" (unwords ["JOIN",(resolveArg message ch),(resolveArg message k)])
+makeAction message  ReloadCommands     = Reload (chan message)
 
 -- ------------------------------------------------------------------------------------------------------------------
 -- Fileparsing of commands
 -- Read in the commands from the designated file
 
-readInCommands :: IO (Either String [Command])
+readInCommands :: IO (Maybe [Command])
 readInCommands = do
     file <- readFile commandFile
     let clean  = filter ((/=';') . head) $ filter (not . null) $ lines file
         cleanr = unwords $ words $ unwords clean
         coms   = read cleanr :: [Command]
-    return $ case getCommands cleanr of
-        Nothing -> Left "There was an Error Parsing the Command File"
-        Just cs -> Right cs
+    return $ getCommands cleanr
 
 reloadCommands :: [Command] -> IO (Either [Command] [Command])
 reloadCommands last = do
     rel <- readInCommands
     return $ case rel of
-      Right new -> Right new
-      Left  _   -> Left last
+      Just new  -> Right new
+      Nothing   -> Left last
 
 getCommands :: String -> Maybe [Command]
 getCommands = accumulateCommands []
