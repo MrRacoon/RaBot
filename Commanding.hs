@@ -49,7 +49,7 @@ tryCommand message command
 --    Passive -> When the bot is not directly beckoned
 --    Always  -> For every message in IRC
 --    Never   -> You may as well just forget about ever seeing this command executed
-
+--
 data C_State = Active   -- Active state involves the issuer talking directly to the bot
              | Passive  -- Passive state is in affect in all cases where the bot is not directly being instigated
              | Always   -- bot will always attempt to run the command regardless of context
@@ -80,8 +80,10 @@ trig (WordPresent w) = (elem w) . words
 -- ------------------------------------------------------------------------------------------------------------------
 -- Actions
 -- The actions are how we will specify the desired action for the command
---    Respond  -> Say something in a channel, the message is dictated by the list of args that will concatenate
---                and the response will land in the channel specified by the Destination
+--    Respond        -> Say something in a channel, the message is dictated by the list of args that will concatenate
+--                      and the response will land in the channel specified by the Destination
+--    JoinChannel    -> join the channel specifed
+--    ReloadCommands -> reload the commands in the command file
 --
 data C_Action = Respond [Argument] Destination -- Respond with the string at the channel specified by destination
               | JoinChannel Argument Argument  -- Join the matched Channel with the matched Key
@@ -100,6 +102,7 @@ data C_Action = Respond [Argument] Destination -- Respond with the string at the
 --    FirstChannel  -> The first channel that comes appears in the message
 --    Channel       -> The channel that the message is originating
 --    Hostname      -> Hostname that the user is connecting from
+--
 data Argument = NULL                     -- For those actions that take optional arguments
               | Literal String           -- Stands for the literal string
               | WordAfter Regex_Text     -- return the first word after some regex
@@ -129,6 +132,7 @@ resolveArg _       NULL              = []
 -- The destination of a Irc Message Message
 --    To_Current -> Sends the message to the current window, in which the IRC line originated
 --    To_Server  -> Sends a message to the server with no Channel used as a Destination
+--    To_Channel -> Send the output to a specified channel (or to a queried nick)
 --
 data Destination = To_Current        -- current window in which some essage was recieved
                  | To_Server         -- no where in particular aside from the server itself RAW
@@ -144,6 +148,8 @@ makeDestination _       (To_Channel s) = s
 -- The BotActions are what the module will strive to return to the calling program
 -- Ready to be interpreted and used
 --    SayToServer -> Send a line ot the server
+--    SayToTerm   -> send some output to the terminal
+--    Reload      -> Reload the commands
 --
 data BotAction = SayToServer String String
                | SayToTerm String
