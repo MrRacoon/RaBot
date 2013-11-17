@@ -91,16 +91,24 @@ data C_Action = Respond [Argument] Destination -- Respond with the string at the
 -- ------------------------------------------------------------------------------------------------------------------
 -- Arguments
 -- The Arguments Allow us to construct Context Aware Messages that we can output back to the user
+--    NULL          -> Null, Return an empty
 --    Literal       -> Stands for the exact string specified
 --    WordAfter     -> Replaces itself with the word Directly following the Regex
 --    AllWordsAfter -> Is replaced By all of the text that comes after the matching string
---
+--    Nickname      -> The nicname of the user sending the message
+--    Username      -> Username of the message's source
+--    FirstChannel  -> The first channel that comes appears in the message
+--    Channel       -> The channel that the message is originating
+--    Hostname      -> Hostname that the user is connecting from
 data Argument = NULL                     -- For those actions that take optional arguments
               | Literal String           -- Stands for the literal string
               | WordAfter Regex_Text     -- return the first word after some regex
               | AllWordsAfter Regex_Text -- Return everything after the Regex
               | Nickname                 -- resolve the Nickname of the sender
               | Username                 -- Resolve the Username of the user
+              | FirstChannel             -- Match the first channel in the message
+              | Channel                  -- Return the current Channel
+              | Hostname                 -- The hostname of the user
     deriving (Show,Read)
 
 resolveArg :: Message -> Argument -> String
@@ -111,6 +119,9 @@ resolveArg message (AllWordsAfter r) = let (_,_,a) = (mess message) =~ r :: (Str
                                         in a
 resolveArg message Nickname          = nick message
 resolveArg message Username          = user message
+resolveArg message FirstChannel      = (mess message) =~ "#[^ ]*" :: String
+resolveArg message Channel           = chan message
+resolveArg message Hostname          = host message
 resolveArg _       NULL              = []
 
 -- ------------------------------------------------------------------------------------------------------------------
