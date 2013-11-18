@@ -36,10 +36,3 @@ parse x
 
 makeMessage :: String -> String -> String -> String -> String -> String
 makeMessage nic usr hst chn mes = ":"++nic++"!"++usr++"@"++hst++" PRIVMSG "++chn++" :"++mes
-
-testMessage  = parse $ makeMessage "Racoon" "suthere" "somewhere.here.not.yeah" "#BatShit" "Hey Pst whatsup doc?"
-testMessage2 = parse $ makeMessage "Racoon" "suthere" "somewhere.here.not.yeah" "#BatShit" "Hey whatsup doc?"
-testMessage3 = parse $ makeMessage "Racoon" "suthere" "somewhere.here.not.yeah" "#BatShit" "RaBot: Hey Pst whatsup doc?"
-testMessage4 = parse $ makeMessage "Racoon" "suthere" "somewhere.here.not.yeah" "#BatShit" ">>= Hey Pst whatsup doc?"
-
-

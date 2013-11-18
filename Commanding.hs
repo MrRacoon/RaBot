@@ -225,15 +225,3 @@ accumulateCommands save next = case reads next :: [(Command,String)] of
                                  [(c,r)]   -> accumulateCommands (c:save) r
                                  []        -> Nothing
 
--- ------------------------------------------------------------------------------------------------------------------
--- Examples
-commandExample1 :: Command
-commandExample1 = Command { state   = Active
-                          , auth    = ["Racoon"]
-                          , usage   = "say 'Pst'"
-                          , desc    = "Test that the bot is actually working"
-                          , trigger = [WordPresent "Pst"]
-                          , action  = [Respond [Literal "Hey I heard That"] To_Current ] }
-
-
-
