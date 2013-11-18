@@ -2,6 +2,7 @@ module Commanding where
 
 -- ------------------------------------------------------------------------------------------------------------------
 
+import Data.List(partition)
 import Messaging
 import Secrets
 import Text.Regex.TDFA
@@ -29,7 +30,7 @@ data Command = Command { state   :: C_State
 --parseCommands :: Message -> [Command] -> Maybe [BotAction]
 parseCommands (IsPING server) = const [SayToServer "" ("PONG :"++server), SayToTerm ("Ponged: "++server)]
 parseCommands (UnknownLine l) = const [SayToTerm l]
-parseCommands mess = ([SayToTerm (show mess)] ++) . concatMap (tryCommand mess)
+parseCommands mess            = ([SayToTerm (show mess)] ++) . (checkCannonRequest $ chan mess). concatMap (tryCommand mess)
 
 
 tryCommand :: Message -> Command -> [BotAction]
@@ -73,7 +74,7 @@ checkState _    _        = False
 data C_Trigger = AllMessages
                | FirstWord Regex_Text
                | WordPresent Regex_Text
-    deriving (Show,Read)
+    deriving (Show,Read,Eq)
 
 trig :: C_Trigger -> (String -> Bool)
 trig AllMessages     = const True
@@ -88,11 +89,16 @@ trig (WordPresent w) = (elem w) . words
 --    JoinChannel    -> join the channel specifed
 --    ReloadCommands -> reload the commands in the command file
 --    LogToFile      -> Log to a file specified by the first args, the content specified by the second
+--    LoadCannons    -> Load all commands into the bot's payload to be fired later
+--    FireCannons    -> Execute the bots payload
 --
 data C_Action = Respond [Argument] Destination
               | JoinChannel Argument Argument
               | ReloadCommands
               | LogToFile [Argument] [Argument]
+              | LoadCannons
+              | CheckCannons
+              | FireCannons
     deriving (Show,Read)
 
 -- ------------------------------------------------------------------------------------------------------------------
@@ -107,13 +113,28 @@ data BotAction = SayToServer String String
                | SayToTerm String
                | Reload String
                | Log [String] String
-    deriving (Show,Read)
+               | CannonRequest
+               | LoadPayload String [BotAction]
+               | ShowPayload String
+               | FirePayload String
+    deriving (Show,Read,Eq)
 
 makeAction :: Message -> C_Action -> BotAction
 makeAction message (Respond args dest)          = SayToServer (makeDestination message dest) (unwords $ map (resolveArg message) args)
 makeAction message (JoinChannel ch k)           = SayToServer "" (unwords ["JOIN",(resolveArg message ch),(resolveArg message k)])
 makeAction message  ReloadCommands              = Reload (chan message)
 makeAction message (LogToFile file args)        = Log (map (resolveArg message) file) (concatMap (resolveArg message) args)
+makeAction message LoadCannons                  = CannonRequest
+makeAction message CheckCannons                 = ShowPayload (chan message)
+makeAction message FireCannons                  = FirePayload (chan message)
+
+loadable (SayToServer _ _) = True
+loadable (SayToTerm _)     = True
+loadable _                 = False
+
+checkCannonRequest chan actions
+      | CannonRequest `elem` actions    = let (load,rest) = partition loadable actions in (LoadPayload chan load) : rest 
+      | otherwise                       = actions
 
 -- ------------------------------------------------------------------------------------------------------------------
 -- Arguments
@@ -149,7 +170,7 @@ resolveArg message (Literal s)       = s
 resolveArg message (WordAfter r)     = let (_,_,a) = (mess message) =~ r :: (String, String, String)
                                         in head $ words a
 resolveArg message (AllWordsAfter r) = let (_,_,a) = (mess message) =~ r :: (String, String, String)
-                                        in a
+                                        in tail a
 resolveArg message Nickname          = nick message
 resolveArg message Username          = user message
 resolveArg message FirstChannel      = (mess message) =~ "#[^ ]*" :: String

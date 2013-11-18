@@ -25,7 +25,7 @@ data BotState = BotState { server   :: String
                          , nickname :: String
                          , masters  :: [String]
                          , commands :: [Command]
-                         , buffer   :: String }
+                         , payload  :: [BotAction] }
           deriving (Show)
 
 type Bot = StateT BotState IO
@@ -55,6 +55,7 @@ listen  = forever $ do
       line <- io $ hGetLine h
       let parsed = parse line
           coms   = parseCommands parsed (commands bs)
+      --mapM (io . putStrLn . ("Triggered: "++) . show) coms
       mapM evalCommand coms
   where
       forever a = do a; forever a
@@ -79,6 +80,24 @@ evalCommand (Log loc   line) = do
   where
       dir  = (logFolder++) $ concat $ intersperse "/" $ init loc
       file = last loc
+evalCommand CannonRequest         = return ()
+evalCommand (LoadPayload chan actions) = do
+      bs <- get
+      say chan "Payload is loaded, Awaiting Firing Procedure"
+      put $ bs {payload = actions}
+evalCommand (ShowPayload chan) = do
+      bs <- get
+      let load = payload bs
+      case load of
+          []  -> say chan "Payload is currently *Empty*"
+          _   -> say chan ("Payload contains *"++(show $ length load)++"* items")
+      mapM (say chan . show) load
+      return ()
+evalCommand (FirePayload chan) = do
+      bs <- get
+      say chan "Releasing Payload"
+      mapM evalCommand $ payload bs
+      return ()
 
 -- -----------------------------------------------------------------------------------------------------------------
 -- IO funtions
