@@ -8,14 +8,15 @@ import Data.List
 import Messaging
 import Network
 import Secrets
+import System.Directory
 import System.IO
 import Text.Printf
 import Text.Regex.TDFA
 
 
 -- ---------------------------------------------------------------------
-  -- dataTypes
-  --
+-- dataTypes
+--
 
 data BotState = BotState { server   :: String
                          , port     :: Integer
@@ -29,9 +30,10 @@ data BotState = BotState { server   :: String
 
 type Bot = StateT BotState IO
 
--- ---------------------------------------------------------------------
-  -- Drivers
-  --
+-- -----------------------------------------------------------------------------------------------------------------
+-- Main Driver
+-- Performs the initialization of the bot
+--
 main = do
       coms <- readInCommands
       h <- connectTo botServer (PortNumber (fromIntegral botPort))
@@ -43,11 +45,9 @@ main = do
           Nothing   -> error "Could not parse the command File...Exiting."
           Just coms -> runStateT listen $ BotState botServer botPort h initChan botNick initMasters coms []
 
-write :: Handle -> String -> String -> IO ()
-write h s t = do
-      hPrintf h "%s %s\r\n" s t
-      printf    "> %s %s\n" s t
-
+-- -----------------------------------------------------------------------------------------------------------------
+-- Listen Command that is going to run the bot forever or until completion
+--
 listen :: Bot a
 listen  = forever $ do
       bs <- get
@@ -59,6 +59,11 @@ listen  = forever $ do
   where
       forever a = do a; forever a
 
+-- -----------------------------------------------------------------------------------------------------------------
+-- Evaluation
+-- Evaluate the commands that are returned from checking the message contents off of the commands held in the bots
+-- internal command store
+--
 evalCommand (SayToServer chan mess) = say chan mess
 evalCommand (SayToTerm str)         = io $ putStrLn str
 evalCommand (Reload chan)           = do
@@ -67,6 +72,23 @@ evalCommand (Reload chan)           = do
       case new of
         Right c -> do say chan "Successfully reloaded :)" >> put (bs {commands = c})
         Left  c -> do say chan "Reload Failed :(" >> put (bs {commands = c})
+evalCommand (Log [loc] line) = io $ appendFile (logFolder++"/"++loc) (line++"\n")
+evalCommand (Log loc   line) = do
+      io $ createDirectoryIfMissing True dir
+      io $ appendFile (dir++"/"++file) (line++"\n")
+  where
+      dir  = (logFolder++) $ concat $ intersperse "/" $ init loc
+      file = last loc
+
+-- -----------------------------------------------------------------------------------------------------------------
+-- IO funtions
+-- Varios functions that perform IO functions including io which lifts IO into the Bot monad
+--
+write :: Handle -> String -> String -> IO ()
+write h s t = do
+      hPrintf h "%s %s\r\n" s t
+      printf    "> %s %s\n" s t
+
 
 say :: String -> String -> StateT BotState IO b
 say chn mes = do

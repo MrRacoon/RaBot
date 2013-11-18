@@ -28,3 +28,6 @@ initMasters = [owner]
 
 -- Filename in which the commands will be loaded
 commandFile = "Commands"
+
+-- Where are the logs going to be storred
+logFolder   = "./logs/"
