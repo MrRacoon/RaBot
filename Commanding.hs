@@ -18,12 +18,12 @@ type Regex_Text = String
 --    trigger -> A list of triggers in which all must be true for the command
 --    action  -> A list of actions that the command will do to fullfill its life
 --
-data Command = Command { state   :: C_State      -- state that the command is in
-                       , auth    :: [String]     -- People with authority to issue the command
-                       , usage   :: String       -- How to use the command
-                       , desc    :: String       -- Description of the command
-                       , trigger :: [C_Trigger]  -- How to trigger the command
-                       , action  :: [C_Action] } -- What the command will do
+data Command = Command { state   :: C_State
+                       , auth    :: [String]
+                       , usage   :: String
+                       , desc    :: String
+                       , trigger :: [C_Trigger]
+                       , action  :: [C_Action] }
     deriving (Show,Read)
 
 --parseCommands :: Message -> [Command] -> Maybe [BotAction]
@@ -50,10 +50,10 @@ tryCommand message command
 --    Always  -> For every message in IRC
 --    Never   -> You may as well just forget about ever seeing this command executed
 --
-data C_State = Active   -- Active state involves the issuer talking directly to the bot
-             | Passive  -- Passive state is in affect in all cases where the bot is not directly being instigated
-             | Always   -- bot will always attempt to run the command regardless of context
-             | Never    -- The bot will never in a million years ever issue the command, it may as well not even exist
+data C_State = Active
+             | Passive
+             | Always
+             | Never
     deriving (Show,Read)
 
 checkState :: Bool -> C_State -> Bool
@@ -70,9 +70,9 @@ checkState _    _        = False
 --    FirstWord   -> The first word in the message matches a given regex
 --    WordPresent -> Some string matching the Regex is present in the message
 --
-data C_Trigger = AllMessages            -- trigger is true on all messages
-               | FirstWord Regex_Text   -- The first word is <String>
-               | WordPresent Regex_Text -- The <String> is present
+data C_Trigger = AllMessages
+               | FirstWord Regex_Text
+               | WordPresent Regex_Text
     deriving (Show,Read)
 
 trig :: C_Trigger -> (String -> Bool)
@@ -89,10 +89,10 @@ trig (WordPresent w) = (elem w) . words
 --    ReloadCommands -> reload the commands in the command file
 --    LogToFile      -> Log to a file specified by the first args, the content specified by the second
 --
-data C_Action = Respond [Argument] Destination             -- Respond with the string at the channel specified by destination
-              | JoinChannel Argument Argument              -- Join the matched Channel with the matched Key
-              | ReloadCommands                             -- Command to Reload the commands of the Bot
-              | LogToFile [Argument] [Argument]            -- Log arguments to a file
+data C_Action = Respond [Argument] Destination
+              | JoinChannel Argument Argument
+              | ReloadCommands
+              | LogToFile [Argument] [Argument]
     deriving (Show,Read)
 
 -- ------------------------------------------------------------------------------------------------------------------
@@ -130,17 +130,17 @@ makeAction message (LogToFile file args)        = Log (map (resolveArg message) 
 --    WholeMessage  -> The entire message field
 --    AllFields     -> The whole message struct including all fields
 --
-data Argument = NULL                     -- For those actions that take optional arguments
-              | Literal String           -- Stands for the literal string
-              | WordAfter Regex_Text     -- return the first word after some regex
-              | AllWordsAfter Regex_Text -- Return everything after the Regex
-              | Nickname                 -- resolve the Nickname of the sender
-              | Username                 -- Resolve the Username of the user
-              | FirstChannel             -- Match the first channel in the message
-              | Channel                  -- Return the current Channel
-              | Hostname                 -- The hostname of the user
-              | WholeMessage             -- The entire message section
-              | AllFields                -- The entire message including the stats
+data Argument = NULL
+              | Literal String
+              | WordAfter Regex_Text
+              | AllWordsAfter Regex_Text
+              | Nickname
+              | Username
+              | FirstChannel
+              | Channel
+              | Hostname
+              | WholeMessage
+              | AllFields
     deriving (Show,Read)
 
 resolveArg :: Message -> Argument -> String
@@ -165,9 +165,9 @@ resolveArg message AllFields         = show message
 --    To_Server  -> Sends a message to the server with no Channel used as a Destination
 --    To_Channel -> Send the output to a specified channel (or to a queried nick)
 --
-data Destination = To_Current        -- current window in which some essage was recieved
-                 | To_Server         -- no where in particular aside from the server itself RAW
-                 | To_Channel String -- A specific destination
+data Destination = To_Current
+                 | To_Server
+                 | To_Channel String
     deriving (Show,Read)
 
 makeDestination :: Message -> Destination -> String
