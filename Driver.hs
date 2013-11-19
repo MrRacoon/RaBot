@@ -65,15 +65,14 @@ listen  = forever $ do
 -- Evaluate the commands that are returned from checking the message contents off of the commands held in the bots
 -- internal command store
 --
-evalCommand (SayToServer chan mess)    = say chan mess
-evalCommand (NoticeToServer chan mess) = notice chan mess
+evalCommand (SayToServer rt chan mess) = say rt chan mess
 evalCommand (SayToTerm str)            = io $ putStrLn str
 evalCommand (Reload chan)              = do
       bs  <- get
       new <- io $ reloadCommands (commands bs)
       case new of
-        Right c -> do say chan "Successfully reloaded :)" >> put (bs {commands = c})
-        Left  c -> do say chan "Reload Failed :(" >> put (bs {commands = c})
+        Right c -> do say PRIVMSG chan "Successfully reloaded :)" >> put (bs {commands = c})
+        Left  c -> do say PRIVMSG chan "Reload Failed :(" >> put (bs {commands = c})
 evalCommand (Log [loc] line) = io $ appendFile (logFolder++"/"++loc) (line++"\n")
 evalCommand (Log loc   line) = do
       io $ createDirectoryIfMissing True dir
@@ -89,9 +88,9 @@ evalCommand (ShowPayload chan) = do
       bs <- get
       let load = payload bs
       case load of
-          []  -> say chan "Payload is currently *Empty*"
-          _   -> say chan ("Payload contains *"++(show $ length load)++"* items")
-      mapM (say chan . show) load
+          []  -> say PRIVMSG chan "Payload is currently *Empty*"
+          _   -> say PRIVMSG chan ("Payload contains *"++(show $ length load)++"* items")
+      mapM (say NOTICE chan . show) load
       return ()
 evalCommand (FirePayload) = do
       bs <- get
@@ -110,13 +109,17 @@ write h s t = do
       printf    "> %s %s\n" s t
 
 
-say :: String -> String -> StateT BotState IO b
-say chn mes = do
+say :: Response_Type -> String -> String -> StateT BotState IO b
+say rt chn mes = do
     bs <- get
     let h = handle bs
-    case chn of
-        [] -> io $ hPrintf h "%s\r\n" mes
-        _  -> io $ hPrintf h "PRIVMSG %s :%s\r\n" chn mes
+    io $ case rt of
+        PRIVMSG -> hPrintf h "PRIVMSG %s :%s\r\n" chn mes
+        NOTICE  -> hPrintf h "NOTICE %s :%s\r\n" chn mes
+        JOIN    -> hPrintf h "JOIN %s\r\n" mes
+        PART    -> hPrintf h "PART %s :parting\r\n" mes
+        QUIT    -> hPrintf h "QUIT :%s\r\n" mes
+        _       -> hPrintf h "%s\r\n" mes
 
 notice :: String -> String -> StateT BotState IO b
 notice chn mes = do

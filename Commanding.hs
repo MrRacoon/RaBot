@@ -28,14 +28,14 @@ data Command = Command { state   :: C_State
     deriving (Show,Read)
 
 --parseCommands :: Message -> [Command] -> Maybe [BotAction]
-parseCommands (IsPING server) = const [SayToServer "" ("PONG :"++server), SayToTerm ("Ponged: "++server)]
+parseCommands (IsPING server) = const [SayToServer RAW "" ("PONG :"++server), SayToTerm ("Ponged: "++server)]
 parseCommands (UnknownLine l) = const [SayToTerm l]
 parseCommands mess            = ([SayToTerm (show mess)] ++) . (checkCannonRequest $ chan mess). concatMap (tryCommand mess)
 parseCommands _               = undefined
 
 
 tryCommand :: Message -> Command -> [BotAction]
-tryCommand (IsPING server) _ = [SayToServer "" ("PONG"++server)]
+tryCommand (IsPING server) _ = [SayToServer RAW "" ("PONG"++server)]
 tryCommand message command
     | copesetic = map (makeAction message) (action command)
     | otherwise = []
@@ -127,9 +127,7 @@ trig _                = const False
 --    LoadCannons    -> Load all commands into the bot's payload to be fired later
 --    FireCannons    -> Execute the bots payload
 --
-data C_Action = Respond [Argument] Destination
-              | Notice [Argument] Destination
-              | JoinChannel Argument Argument
+data C_Action = Respond Response_Type [Argument] Destination
               | ReloadCommands
               | LogToFile [Argument] [Argument]
               | LoadCannons
@@ -145,8 +143,7 @@ data C_Action = Respond [Argument] Destination
 --    Reload      -> Reload the commands
 --    Log         -> log to a file
 --
-data BotAction = SayToServer String String
-               | NoticeToServer String String
+data BotAction = SayToServer Response_Type String String
                | SayToTerm String
                | Reload String
                | Log [String] String
@@ -157,9 +154,7 @@ data BotAction = SayToServer String String
     deriving (Show,Read,Eq)
 
 makeAction :: Message -> C_Action -> BotAction
-makeAction message (Respond args dest)          = SayToServer (makeDestination message dest) (unwords $ map (resolveArg message) args)
-makeAction message (Notice args dest)           = NoticeToServer (makeDestination message dest) (unwords $ map (resolveArg message) args)
-makeAction message (JoinChannel ch k)           = SayToServer "" (unwords ["JOIN",(resolveArg message ch),(resolveArg message k)])
+makeAction message (Respond rt args dest)       = SayToServer rt (makeDestination message dest) (unwords $ map (resolveArg message) args)
 makeAction message  ReloadCommands              = Reload (chan message)
 makeAction message (LogToFile file args)        = Log (map (resolveArg message) file) (concatMap (resolveArg message) args)
 makeAction message LoadCannons                  = CannonRequest
@@ -167,9 +162,9 @@ makeAction message CheckCannons                 = ShowPayload (chan message)
 makeAction message FireCannons                  = FirePayload
 makeAction message _                            = undefined
 
-loadable (SayToServer _ _) = True
-loadable (SayToTerm _)     = True
-loadable _                 = False
+loadable (SayToServer PRIVMSG _ _) = True
+loadable (SayToTerm _)             = True
+loadable _                         = False
 
 checkCannonRequest chan actions
       | CannonRequest `elem` actions    = let (load,rest) = partition loadable actions in (LoadPayload load) : rest 
@@ -238,6 +233,16 @@ makeDestination _       (To_Channel s) = s
 makeDestination _       _              = undefined
 
 -- ------------------------------------------------------------------------------------------------------------------
+-- Message Types
+--
+data Response_Type = PRIVMSG
+                   | NOTICE
+                   | JOIN
+                   | PART
+                   | QUIT
+                   | RAW
+    deriving (Show,Read,Eq)
+-- ------------------------------------------------------------------------------------------------------------------
 -- Fileparsing of commands
 -- Read in the commands from the designated file
 
@@ -264,5 +269,5 @@ accumulateCommands save []   = Just (save)
 accumulateCommands save next = case reads next :: [(Command,String)] of
                                  [(c,[])]  -> Just (c:save)
                                  [(c,r)]   -> accumulateCommands (c:save) r
-                                 []        -> Nothing
+                                 []        -> error next
 
