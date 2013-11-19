@@ -196,6 +196,8 @@ data Argument = NULL
               | Hostname
               | WholeMessage
               | AllFields
+              | KarmaUP Argument
+              | KarmaDOWN Argument
     deriving (Show,Read)
 
 resolveArg :: Message -> Argument -> String
@@ -212,6 +214,8 @@ resolveArg message Channel           = chan message
 resolveArg message Hostname          = host message
 resolveArg message WholeMessage      = mess message
 resolveArg message AllFields         = show message
+resolveArg message (KarmaUP a)       = (++"++") $ resolveArg message a
+resolveArg message (KarmaDOWN a)     = (++"--") $ resolveArg message a
 resolveArg message _                 = undefined
 
 -- ------------------------------------------------------------------------------------------------------------------
