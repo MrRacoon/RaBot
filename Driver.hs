@@ -81,9 +81,8 @@ evalCommand (Log loc   line) = do
       dir  = (logFolder++) $ concat $ intersperse "/" $ init loc
       file = last loc
 evalCommand CannonRequest         = return ()
-evalCommand (LoadPayload chan actions) = do
+evalCommand (LoadPayload actions) = do
       bs <- get
-      say chan "Payload is loaded, Awaiting Firing Procedure"
       put $ bs {payload = actions}
 evalCommand (ShowPayload chan) = do
       bs <- get
@@ -93,9 +92,8 @@ evalCommand (ShowPayload chan) = do
           _   -> say chan ("Payload contains *"++(show $ length load)++"* items")
       mapM (say chan . show) load
       return ()
-evalCommand (FirePayload chan) = do
+evalCommand (FirePayload) = do
       bs <- get
-      say chan "Releasing Payload"
       mapM evalCommand $ payload bs
       return ()
 

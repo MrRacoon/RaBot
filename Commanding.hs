@@ -20,7 +20,7 @@ type Regex_Text = String
 --    action  -> A list of actions that the command will do to fullfill its life
 --
 data Command = Command { state   :: C_State
-                       , auth    :: [String]
+                       , auth    :: [ACL]
                        , usage   :: String
                        , desc    :: String
                        , trigger :: [C_Trigger]
@@ -31,6 +31,7 @@ data Command = Command { state   :: C_State
 parseCommands (IsPING server) = const [SayToServer "" ("PONG :"++server), SayToTerm ("Ponged: "++server)]
 parseCommands (UnknownLine l) = const [SayToTerm l]
 parseCommands mess            = ([SayToTerm (show mess)] ++) . (checkCannonRequest $ chan mess). concatMap (tryCommand mess)
+parseCommands _               = undefined
 
 
 tryCommand :: Message -> Command -> [BotAction]
@@ -40,12 +41,13 @@ tryCommand message command
     | otherwise = []
   where
     copesetic  = authorized && triggered && stated
-    authorized = (nick message) `elem` (auth command) || null (auth command) || (nick message) == owner
+    authorized = any (checkAcl message) $ (auth command) ++ [ACL_M (Auth_Nick ownerNick) (Auth_User ownerUser)]
     triggered  = all (flip trig (mess message)) (trigger command)
     stated     = checkState (actv message) (state command)
 
 -- ------------------------------------------------------------------------------------------------------------------
 -- Command States
+-- Define the context of a command in terms of whether the message targets the bot or not
 --    Active  -> When the Bot is beckoned
 --    Passive -> When the bot is not directly beckoned
 --    Always  -> For every message in IRC
@@ -64,6 +66,36 @@ checkState True  Active  = True
 checkState False Passive = True
 checkState _    _        = False
 
+
+-- ------------------------------------------------------------------------------------------------------------------
+-- Authorization
+-- Specify who can execute Commands, all auth tokens specify a user, or group that has sufficient access to execute
+-- the command it is included in. A null list stands for anyone.
+--    Auth_Nick -> Nickname matches sender
+--    Auth_User -> Username matches sender
+--    Auth_Host -> Hostname matches sender
+--
+data ACL = ACL_N
+         | ACL_W Authorization
+         | ACL_M Authorization Authorization
+         | ACL_S Authorization Authorization Authorization
+    deriving (Show,Read)
+
+checkAcl message ACL_N         = True
+checkAcl message (ACL_W a)     = (authed message a)
+checkAcl message (ACL_M a b)   = (authed message a) && (authed message b)
+checkAcl message (ACL_S a b c) = (authed message a) && (authed message b) && (authed message c)
+
+data Authorization = Auth_Nick String
+                   | Auth_User String
+                   | Auth_Host String
+    deriving (Show,Read)
+
+authed message (Auth_Nick n) = n == (nick message)
+authed message (Auth_User u) = u == (user message)
+authed message (Auth_Host h) = h == (host message)
+authed message _             = False
+
 -- ------------------------------------------------------------------------------------------------------------------
 -- Triggers
 -- How will we know when to execute a given command? One Word: Triggers
@@ -80,6 +112,7 @@ trig :: C_Trigger -> (String -> Bool)
 trig AllMessages     = const True
 trig (FirstWord w)   = (==w) . head . words
 trig (WordPresent w) = (elem w) . words
+trig _               = const False
 
 -- ------------------------------------------------------------------------------------------------------------------
 -- Actions
@@ -114,9 +147,9 @@ data BotAction = SayToServer String String
                | Reload String
                | Log [String] String
                | CannonRequest
-               | LoadPayload String [BotAction]
+               | LoadPayload [BotAction]
                | ShowPayload String
-               | FirePayload String
+               | FirePayload
     deriving (Show,Read,Eq)
 
 makeAction :: Message -> C_Action -> BotAction
@@ -126,14 +159,15 @@ makeAction message  ReloadCommands              = Reload (chan message)
 makeAction message (LogToFile file args)        = Log (map (resolveArg message) file) (concatMap (resolveArg message) args)
 makeAction message LoadCannons                  = CannonRequest
 makeAction message CheckCannons                 = ShowPayload (chan message)
-makeAction message FireCannons                  = FirePayload (chan message)
+makeAction message FireCannons                  = FirePayload
+makeAction message _                            = undefined
 
 loadable (SayToServer _ _) = True
 loadable (SayToTerm _)     = True
 loadable _                 = False
 
 checkCannonRequest chan actions
-      | CannonRequest `elem` actions    = let (load,rest) = partition loadable actions in (LoadPayload chan load) : rest 
+      | CannonRequest `elem` actions    = let (load,rest) = partition loadable actions in (LoadPayload load) : rest 
       | otherwise                       = actions
 
 -- ------------------------------------------------------------------------------------------------------------------
@@ -178,6 +212,7 @@ resolveArg message Channel           = chan message
 resolveArg message Hostname          = host message
 resolveArg message WholeMessage      = mess message
 resolveArg message AllFields         = show message
+resolveArg message _                 = undefined
 
 -- ------------------------------------------------------------------------------------------------------------------
 -- Destination
@@ -195,6 +230,7 @@ makeDestination :: Message -> Destination -> String
 makeDestination message To_Current     = chan message
 makeDestination _       To_Server      = []
 makeDestination _       (To_Channel s) = s
+makeDestination _       _              = undefined
 
 -- ------------------------------------------------------------------------------------------------------------------
 -- Fileparsing of commands
