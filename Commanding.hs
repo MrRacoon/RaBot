@@ -106,13 +106,15 @@ authed message _             = False
 data C_Trigger = AllMessages
                | FirstWord Regex_Text
                | WordPresent Regex_Text
+               | EntireMessage Regex_Text
     deriving (Show,Read,Eq)
 
 trig :: C_Trigger -> (String -> Bool)
-trig AllMessages     = const True
-trig (FirstWord w)   = (==w) . head . words
-trig (WordPresent w) = (elem w) . words
-trig _               = const False
+trig AllMessages      = const True
+trig (FirstWord w)    = (==w) . head . words
+trig (WordPresent w)  = (elem w) . words
+trig (EntireMessage r) = (r==)
+trig _                = const False
 
 -- ------------------------------------------------------------------------------------------------------------------
 -- Actions
@@ -126,6 +128,7 @@ trig _               = const False
 --    FireCannons    -> Execute the bots payload
 --
 data C_Action = Respond [Argument] Destination
+              | Notice [Argument] Destination
               | JoinChannel Argument Argument
               | ReloadCommands
               | LogToFile [Argument] [Argument]
@@ -143,6 +146,7 @@ data C_Action = Respond [Argument] Destination
 --    Log         -> log to a file
 --
 data BotAction = SayToServer String String
+               | NoticeToServer String String
                | SayToTerm String
                | Reload String
                | Log [String] String
@@ -154,6 +158,7 @@ data BotAction = SayToServer String String
 
 makeAction :: Message -> C_Action -> BotAction
 makeAction message (Respond args dest)          = SayToServer (makeDestination message dest) (unwords $ map (resolveArg message) args)
+makeAction message (Notice args dest)           = NoticeToServer (makeDestination message dest) (unwords $ map (resolveArg message) args)
 makeAction message (JoinChannel ch k)           = SayToServer "" (unwords ["JOIN",(resolveArg message ch),(resolveArg message k)])
 makeAction message  ReloadCommands              = Reload (chan message)
 makeAction message (LogToFile file args)        = Log (map (resolveArg message) file) (concatMap (resolveArg message) args)

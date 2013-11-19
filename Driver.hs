@@ -65,9 +65,10 @@ listen  = forever $ do
 -- Evaluate the commands that are returned from checking the message contents off of the commands held in the bots
 -- internal command store
 --
-evalCommand (SayToServer chan mess) = say chan mess
-evalCommand (SayToTerm str)         = io $ putStrLn str
-evalCommand (Reload chan)           = do
+evalCommand (SayToServer chan mess)    = say chan mess
+evalCommand (NoticeToServer chan mess) = notice chan mess
+evalCommand (SayToTerm str)            = io $ putStrLn str
+evalCommand (Reload chan)              = do
       bs  <- get
       new <- io $ reloadCommands (commands bs)
       case new of
@@ -96,6 +97,8 @@ evalCommand (FirePayload) = do
       bs <- get
       mapM evalCommand $ payload bs
       return ()
+evalCommand not_a_command = do
+      io $ printf "Could not execute: $s" $ show not_a_command
 
 -- -----------------------------------------------------------------------------------------------------------------
 -- IO funtions
@@ -114,6 +117,14 @@ say chn mes = do
     case chn of
         [] -> io $ hPrintf h "%s\r\n" mes
         _  -> io $ hPrintf h "PRIVMSG %s :%s\r\n" chn mes
+
+notice :: String -> String -> StateT BotState IO b
+notice chn mes = do
+    bs <- get
+    let h = handle bs
+    case chn of
+        [] -> io $ printf "attempted to notify without specifying channel\n"
+        _  -> io $ hPrintf h "NOTICE %s :%s\r\n" chn mes
 
 io :: IO a -> Bot a
 io = liftIO
