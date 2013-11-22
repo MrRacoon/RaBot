@@ -12,6 +12,7 @@ type Regex_Text = String
 -- ------------------------------------------------------------------------------------------------------------------
 -- The Configurable Command structure
 -- The commands will essentially take this form in the command file
+--    name    -> name of the command, should be unique
 --    state   -> Single state for the command
 --    auth    -> List of users that may use the command
 --    usage   -> A string detailing how to use the command
@@ -19,7 +20,8 @@ type Regex_Text = String
 --    trigger -> A list of triggers in which all must be true for the command
 --    action  -> A list of actions that the command will do to fullfill its life
 --
-data Command = Command { state   :: C_State
+data Command = Command { name    :: String
+                       , state   :: C_State
                        , auth    :: [ACL]
                        , usage   :: String
                        , desc    :: String
@@ -41,7 +43,7 @@ tryCommand message command
     | otherwise = []
   where
     copesetic  = authorized && triggered && stated
-    authorized = any (checkAcl message) $ (auth command) ++ [ACL_M (Auth_Nick ownerNick) (Auth_User ownerUser)]
+    authorized = checkAclList message (auth command)
     triggered  = all (flip trig (mess message)) (trigger command)
     stated     = checkState (actv message) (state command)
 
@@ -79,7 +81,12 @@ data ACL = ACL_N
          | ACL_W Authorization
          | ACL_M Authorization Authorization
          | ACL_S Authorization Authorization Authorization
-    deriving (Show,Read)
+    deriving (Show,Read,Eq)
+
+checkAclList  message []        = checkAcl message (ACL_M (Auth_Nick ownerNick) (Auth_User ownerUser))
+checkAclList  message list      = checkAclList' message list
+checkAclList' message (x:xs)    = (checkAcl message x) || (checkAclList' message xs)
+checkAclList' message _         = checkAcl message (ACL_M (Auth_Nick ownerNick) (Auth_User ownerUser))
 
 checkAcl message ACL_N         = True
 checkAcl message (ACL_W a)     = (authed message a)
@@ -89,7 +96,7 @@ checkAcl message (ACL_S a b c) = (authed message a) && (authed message b) && (au
 data Authorization = Auth_Nick String
                    | Auth_User String
                    | Auth_Host String
-    deriving (Show,Read)
+    deriving (Show,Read,Eq)
 
 authed message (Auth_Nick n) = n == (nick message)
 authed message (Auth_User u) = u == (user message)
@@ -133,6 +140,12 @@ data C_Action = Respond Response_Type [Argument] Destination
               | LoadCannons
               | CheckCannons
               | FireCannons
+              | HelpCommandList
+              | HelpUsageList
+              | HelpDescriptionList
+              | HelpCommandListAll
+              | HelpUsageListAll
+              | HelpDescriptionListAll
     deriving (Show,Read)
 
 -- ------------------------------------------------------------------------------------------------------------------
@@ -151,6 +164,8 @@ data BotAction = SayToServer Response_Type String String
                | LoadPayload [BotAction]
                | ShowPayload String
                | FirePayload
+               | DisplayHelp Message Int Bool
+               | Not_a_command
     deriving (Show,Read,Eq)
 
 makeAction :: Message -> C_Action -> BotAction
@@ -160,6 +175,12 @@ makeAction message (LogToFile file args)        = Log (map (resolveArg message) 
 makeAction message LoadCannons                  = CannonRequest
 makeAction message CheckCannons                 = ShowPayload (chan message)
 makeAction message FireCannons                  = FirePayload
+makeAction message HelpCommandList              = DisplayHelp message 1 False
+makeAction message HelpCommandListAll           = DisplayHelp message 1 True
+makeAction message HelpUsageList                = DisplayHelp message 2 False
+makeAction message HelpUsageListAll             = DisplayHelp message 2 True
+makeAction message HelpDescriptionList          = DisplayHelp message 3 False
+makeAction message HelpDescriptionListAll       = DisplayHelp message 3 True
 makeAction message _                            = undefined
 
 loadable (SayToServer PRIVMSG _ _) = True
@@ -271,7 +292,7 @@ getCommands = accumulateCommands []
 accumulateCommands :: [Command] -> String -> Maybe [Command]
 accumulateCommands save []   = Just (save)
 accumulateCommands save next = case reads next :: [(Command,String)] of
-                                 [(c,[])]  -> Just (c:save)
+                                 [(c,[])]  -> Just $ reverse (c:save)
                                  [(c,r)]   -> accumulateCommands (c:save) r
                                  []        -> error next
 

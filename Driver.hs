@@ -36,9 +36,10 @@ type Bot = StateT BotState IO
 --
 main = do
       coms <- readInCommands
+      hst <- hostname
       h <- connectTo botServer (PortNumber (fromIntegral botPort))
       hSetBuffering h NoBuffering
-      write h "NICK" botNick
+      write h "NICK" $ botNick
       write h "USER" (botNick++" 0 * :"++botDesc)
       write h "JOIN" initChan
       case coms of
@@ -95,6 +96,24 @@ evalCommand (ShowPayload chan) = do
 evalCommand (FirePayload) = do
       bs <- get
       mapM evalCommand $ payload bs
+      return ()
+evalCommand (DisplayHelp mess typ all) = do
+      bs <- get
+      let comms = filter (not . null . name) $ commands bs
+          tshow = case all of
+                    True  -> comms
+                    False -> filter (\x -> checkAclList mess (auth x)) comms
+          msgs  = case typ of
+                    1 -> let names = unwords $ map name tshow
+                             in [SayToServer PRIVMSG (chan mess) ("Commands: "++names) ]
+                    2 -> map (\x -> SayToServer PRIVMSG (chan mess) (usage x)) tshow
+                    3 -> let names = map name tshow
+                             width = maximum $ map length names
+                             cols  = map (\x -> x ++ (replicate (width - (length x)) ' ') ++ " : ") names
+                             descs = map desc tshow
+                              in map (SayToServer PRIVMSG (chan mess)) (zipWith (++) cols descs)
+                    _ -> [Not_a_command]
+      mapM evalCommand msgs
       return ()
 evalCommand not_a_command = do
       io $ printf "Could not execute: $s" $ show not_a_command

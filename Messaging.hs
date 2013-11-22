@@ -15,7 +15,7 @@ data Message = UnknownLine String
                          , chan :: String
                          , mess :: String
                          , actv :: Bool  }
-    deriving Show
+    deriving (Show, Read, Eq)
 
 parse :: String -> Message
 parse x
@@ -26,7 +26,7 @@ parse x
                              (c,_,source)  = b =~ "@"         :: (String, String, String)
                              (d,_,usr)     = c =~ "!"         :: (String, String, String)
                              nic           = tail d
-                             (_,m,p)       = message =~ ("("++botNick++": |"++attChar++" )") :: (String, String, String)
+                             (_,m,p)       = message =~ ("(^"++botNick++": |^"++attChar++" )") :: (String, String, String)
                          in case null m of
                               True  -> IsPRIVMSG nic usr source channel message False
                               False -> IsPRIVMSG nic usr source channel p True
