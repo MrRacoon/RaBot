@@ -34,9 +34,8 @@ type Bot = StateT BotState IO
 -- Main Driver
 -- Performs the initialization of the bot
 --
-main = do
+drive = do
       coms <- readInCommands
-      hst <- hostname
       h <- connectTo botServer (PortNumber (fromIntegral botPort))
       hSetBuffering h NoBuffering
       write h "NICK" $ botNick
