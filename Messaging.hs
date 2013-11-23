@@ -21,15 +21,16 @@ parse :: String -> Message
 parse x
     | x =~ "PING :"    = let (_,_,a)       = x =~ "PING :"    :: (String, String, String)
                          in IsPING a
-    | x =~ " PRIVMSG " = let (a,_,message) = x =~ " :"        :: (String, String, String)
-                             (b,_,channel) = a =~ " PRIVMSG " :: (String, String, String)
-                             (c,_,source)  = b =~ "@"         :: (String, String, String)
-                             (d,_,usr)     = c =~ "!"         :: (String, String, String)
-                             nic           = tail d
-                             (_,m,p)       = message =~ ("(^"++botNick++": |^"++attChar++" )") :: (String, String, String)
-                         in case null m of
-                              True  -> IsPRIVMSG nic usr source channel message False
-                              False -> IsPRIVMSG nic usr source channel p True
+    | x =~ " PRIVMSG " = let (a,_,mes_field) = x =~ " :"        :: (String, String, String)
+                             (b,_,chn_field) = a =~ " PRIVMSG " :: (String, String, String)
+                             (c,_,hst_field) = b =~ "@"         :: (String, String, String)
+                             (d,_,usr_field) = c =~ "!"         :: (String, String, String)
+                             nic_field       = tail d
+                             (_,m,p)         = mes_field =~ ("(^"++botNick++": |^"++attChar++" )") :: (String, String, String)
+                             active          = ((chn_field == botNick) || (not $ null m))
+                             chan            = if chn_field == botNick then nic_field else chn_field
+                             mess            = if null m then mes_field else p
+                         in IsPRIVMSG nic_field usr_field hst_field chan mess active
     | otherwise        = UnknownLine x
 
 -- ------------------------------------------------------------------------------------------------------------------
