@@ -30,7 +30,7 @@ data Command = Command { name    :: String
     deriving (Show,Read)
 
 --parseCommands :: Message -> [Command] -> Maybe [BotAction]
-parseCommands (IsPING server) = const [SayToServer RAW "" ("PONG :"++server), SayToTerm ("Ponged: "++server)]
+parseCommands (PING server)   = const [SayToServer RAW "" ("PONG :"++server), SayToTerm ("Ponged: "++server)]
 parseCommands (UnknownLine l) = const [SayToTerm l]
 parseCommands mess            = ([SayToTerm (show mess)] ++) . (checkCannonRequest $ chan mess). concatMap (tryCommand mess)
 parseCommands _               = undefined
