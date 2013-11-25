@@ -239,6 +239,7 @@ data Argument = NULL
               | AllFields
               | KarmaUP Argument
               | KarmaDOWN Argument
+              | SourceUrl
     deriving (Show,Read)
 
 resolveArg :: Message -> Argument -> String
@@ -257,6 +258,7 @@ resolveArg message WholeMessage      = mess message
 resolveArg message AllFields         = show message
 resolveArg message (KarmaUP a)       = (++"++") $ resolveArg message a
 resolveArg message (KarmaDOWN a)     = (++"--") $ resolveArg message a
+resolveArg _       SourceUrl         = repo
 
 -- ------------------------------------------------------------------------------------------------------------------
 -- Destination
