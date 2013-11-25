@@ -159,7 +159,7 @@ rmUser c n ((a,b):xs)
 
 addUser c n []  = [(c,[n])]
 addUser c n ((a,b):xs)
-    | c == a    = (a,(n:b)) : xs
+    | c == a    = if elem n b then (a,b) : xs else(a,(n:b)) : xs
     | otherwise = (a,b) : (addUser c n xs)
 
 getUsers _ []   = []
