@@ -30,22 +30,38 @@ data Command = Command { name    :: String
     deriving (Show,Read)
 
 --parseCommands :: Message -> [Command] -> Maybe [BotAction]
-parseCommands (PING server)   = const [SayToServer RAW "" ("PONG :"++server), SayToTerm ("Ponged: "++server)]
-parseCommands (UnknownLine l) = const [SayToTerm l]
-parseCommands mess            = ([SayToTerm (show mess)] ++) . (checkCannonRequest $ chan mess). concatMap (tryCommand mess)
-parseCommands _               = undefined
+parseCommands :: Message -> [Command] -> [BotAction]
+parseCommands mes com
+     = let always  = [SayToTerm (show mes)]
+       in (always++) $ case mes of
+          (PING h)            -> [SayToServer Raw "" ("PONG :"++h), SayToTerm ("PONGED: "++h)]
+          (PRIVMSG a b c d e) -> checkCannonRequest d $ concatMap (tryCommand mes) com
+          (JOIN a b c d)      -> [UserAdd d a]
+          (PART a b c d)      -> [UserPart d a]
+          (QUIT a b c d)      -> [UserQuit a]
+          (SERV a b c d)      -> interpretServ mes
+          (NICK a b c d)      -> [UserNick a d]
+          _        -> []
 
 
 tryCommand :: Message -> Command -> [BotAction]
-tryCommand (IsPING server) _ = [SayToServer RAW "" ("PONG"++server)]
-tryCommand message command
-    | copesetic = map (makeAction message) (action command)
+tryCommand m@(PRIVMSG nic usr hst chn mes) command
+    | copesetic = map (makeAction (PRIVMSG nic usr hst chn messg)) (action command)
     | otherwise = []
   where
     copesetic  = authorized && triggered && stated
-    authorized = checkAclList message (auth command)
-    triggered  = all (flip trig (mess message)) (trigger command)
-    stated     = checkState (actv message) (state command)
+    authorized = checkAclList m (auth command)
+    triggered  = all (flip trig messg) (trigger command)
+    (a,b,c)    = (mes =~ ("(^"++botNick++" |^"++attChar++" )") :: (String, String, String))
+    st         = not $ null b
+    messg      = if st then c else a
+    stated     = checkState st (state command)
+
+
+interpretServ (SERV a "353" c d) = let (chan:nics) = words d
+                                       list        = words $ tail $ unwords nics
+                                   in map (UserAdd chan) list
+interpretServ _ = []
 
 -- ------------------------------------------------------------------------------------------------------------------
 -- Command States
@@ -86,7 +102,6 @@ data ACL = ACL_N
 checkAclList  message []        = checkAcl message (ACL_M (Auth_Nick ownerNick) (Auth_User ownerUser))
 checkAclList  message list      = checkAclList' message list
 checkAclList' message (x:xs)    = (checkAcl message x) || (checkAclList' message xs)
-checkAclList' message _         = checkAcl message (ACL_M (Auth_Nick ownerNick) (Auth_User ownerUser))
 
 checkAcl message ACL_N         = True
 checkAcl message (ACL_W a)     = (authed message a)
@@ -101,7 +116,6 @@ data Authorization = Auth_Nick String
 authed message (Auth_Nick n) = n == (nick message)
 authed message (Auth_User u) = u == (user message)
 authed message (Auth_Host h) = h == (host message)
-authed message _             = False
 
 -- ------------------------------------------------------------------------------------------------------------------
 -- Triggers
@@ -121,7 +135,6 @@ trig AllMessages      = const True
 trig (FirstWord w)    = (==w) . head . words
 trig (WordPresent w)  = (elem w) . words
 trig (EntireMessage r) = (r==)
-trig _                = const False
 
 -- ------------------------------------------------------------------------------------------------------------------
 -- Actions
@@ -146,6 +159,7 @@ data C_Action = Respond Response_Type [Argument] Destination
               | HelpCommandListAll
               | HelpUsageListAll
               | HelpDescriptionListAll
+              | ShowCurrentUsers
     deriving (Show,Read)
 
 -- ------------------------------------------------------------------------------------------------------------------
@@ -156,7 +170,8 @@ data C_Action = Respond Response_Type [Argument] Destination
 --    Reload      -> Reload the commands
 --    Log         -> log to a file
 --
-data BotAction = SayToServer Response_Type String String
+data BotAction = Ping String
+               | SayToServer Response_Type String String
                | SayToTerm String
                | Reload String
                | Log [String] String
@@ -165,6 +180,11 @@ data BotAction = SayToServer Response_Type String String
                | ShowPayload String
                | FirePayload
                | DisplayHelp Message Int Bool
+               | UserAdd String String
+               | UserQuit String
+               | UserPart String String
+               | UserNick String String
+               | ShowUsers String
                | Not_a_command
     deriving (Show,Read,Eq)
 
@@ -181,9 +201,9 @@ makeAction message HelpUsageList                = DisplayHelp message 2 False
 makeAction message HelpUsageListAll             = DisplayHelp message 2 True
 makeAction message HelpDescriptionList          = DisplayHelp message 3 False
 makeAction message HelpDescriptionListAll       = DisplayHelp message 3 True
-makeAction message _                            = undefined
+makeAction message ShowCurrentUsers             = ShowUsers (chan message)
 
-loadable (SayToServer PRIVMSG _ _) = True
+loadable (SayToServer Privmsg _ _) = True
 loadable (SayToTerm _)             = True
 loadable _                         = False
 
@@ -237,7 +257,6 @@ resolveArg message WholeMessage      = mess message
 resolveArg message AllFields         = show message
 resolveArg message (KarmaUP a)       = (++"++") $ resolveArg message a
 resolveArg message (KarmaDOWN a)     = (++"--") $ resolveArg message a
-resolveArg message _                 = undefined
 
 -- ------------------------------------------------------------------------------------------------------------------
 -- Destination
@@ -255,17 +274,16 @@ makeDestination :: Message -> Destination -> String
 makeDestination message To_Current     = chan message
 makeDestination _       To_Server      = []
 makeDestination _       (To_Channel s) = s
-makeDestination _       _              = undefined
 
 -- ------------------------------------------------------------------------------------------------------------------
 -- Message Types
 --
-data Response_Type = PRIVMSG
-                   | NOTICE
-                   | JOIN
-                   | PART
-                   | QUIT
-                   | RAW
+data Response_Type = Privmsg
+                   | Notice
+                   | Join
+                   | Part
+                   | Quit
+                   | Raw
     deriving (Show,Read,Eq)
 -- ------------------------------------------------------------------------------------------------------------------
 -- Fileparsing of commands

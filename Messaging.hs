@@ -73,14 +73,14 @@ instance IRC Message where
     mess _                     = []
     code (SERV _ c _ _)        =  c
     code _                     = []
-    natv (PRIVMSG n u h c m)   = ":"++n++"!"++u++"@"++h++" PRIVMSG "++c++" :"++m++"\n"
-    natv (JOIN n u h c)        = ":"++n++"!"++u++"@"++h++" JOIN "++c++"\n"
-    natv (PART n u h c)        = ":"++n++"!"++u++"@"++h++" PART "++c++"\n"
-    natv (QUIT n u h m)        = ":"++n++"!"++u++"@"++h++" QUIT "++":"++m++"\n"
-    natv (NICK n u h m)        = ":"++n++"!"++u++"@"++h++" NICK "++":"++m++"\n"
-    natv (SERV h c n m)        = ":"++h++" "++c++" "++n++" :"++m++"\n"
-    natv (PING h)              = "PING :"++h++"\n"
-    natv (UNKNOWN s)           = s++"\n"
+    natv (PRIVMSG n u h c m)   = ":"++n++"!"++u++"@"++h++" PRIVMSG "++c++" :"++m++"\r"
+    natv (JOIN n u h c)        = ":"++n++"!"++u++"@"++h++" JOIN "++c++"\r"
+    natv (PART n u h c)        = ":"++n++"!"++u++"@"++h++" PART "++c++"\r"
+    natv (QUIT n u h m)        = ":"++n++"!"++u++"@"++h++" QUIT "++":"++m++"\r"
+    natv (NICK n u h m)        = ":"++n++"!"++u++"@"++h++" NICK "++":"++m++"\r"
+    natv (SERV h c n m)        = ":"++h++" "++c++" "++n++" :"++m++"\r"
+    natv (PING h)              = "PING :"++h++"\r"
+    natv (UNKNOWN s)           = s++"\r"
     reed                       = readMessage
 
 -- ------------------------------------------------------------------
@@ -89,8 +89,8 @@ instance IRC Message where
 --
 parse :: String -> Message
 parse str = case readMessage str of
+              []    -> UNKNOWN str
               (x:_) -> fst x
-              _     -> UNKNOWN str
 
 parseList :: String -> [Message]
 parseList []  = []
@@ -109,13 +109,13 @@ toSerial = concatMap natv
 readMessage :: ReadS Message
 readMessage s =  [ (PING hst, res)
                  | ("PING",as)    <- s `till` ' '
-                 , (hst,res)      <- (tail as) `till` '\n']
+                 , (hst,res)      <- (tail as) `till` '\r']
               ++ [ (SERV hst cde nic mes, res)
                  | (":",zs)       <- [splitAt 1 s]
                  , (hst,as)       <- zs `till` ' '
                  , (cde,bs)       <- as `till` ' '
                  , (nic,cs)       <- bs `till` ' '
-                 , (mes,res)      <- (tail cs) `till` '\n'
+                 , (mes,res)      <- (tail cs) `till` '\r'
                  , nic == botNick
                  , (length cde) == 3 ]
               ++ [ (PRIVMSG nic usr hst chn mes, res)
@@ -125,7 +125,7 @@ readMessage s =  [ (PING hst, res)
                  , (hst,cs)       <- bs `till` ' '
                  , ("PRIVMSG",ds) <- cs `till` ' '
                  , (chn,es)       <- ds `till` ' '
-                 , (mes,res)      <- (tail es) `till` '\n'
+                 , (mes,res)      <- (tail es) `till` '\r'
                  , (length nic) <= 18 ]
               ++ [ (JOIN nic usr hst chn, res)
                  | (":",zs)       <- [splitAt 1 s]
@@ -133,7 +133,7 @@ readMessage s =  [ (PING hst, res)
                  , (usr,bs)       <- as `till` '@'
                  , (hst,cs)       <- bs `till` ' '
                  , ("JOIN",ds)    <- cs `till` ' '
-                 , (chn,res)      <- ds `till` '\n'
+                 , (chn,res)      <- ds `till` '\r'
                  , (length nic) <= 18 ]
               ++ [ (PART nic usr hst chn, res)
                  | (":",zs)       <- [splitAt 1 s]
@@ -141,7 +141,7 @@ readMessage s =  [ (PING hst, res)
                  , (usr,bs)       <- as `till` '@'
                  , (hst,cs)       <- bs `till` ' '
                  , ("PART",ds)    <- cs `till` ' '
-                 , (chn,res)      <- ds `till` '\n'
+                 , (chn,res)      <- ds `till` '\r'
                  , (length nic) <= 18 ]
               ++ [ (QUIT nic usr hst mes, res)
                  | (":",zs)       <- [splitAt 1 s]
@@ -149,7 +149,7 @@ readMessage s =  [ (PING hst, res)
                  , (usr,bs)       <- as `till` '@'
                  , (hst,cs)       <- bs `till` ' '
                  , ("QUIT",ds)    <- cs `till` ' '
-                 , (mes,res)      <- (tail ds) `till` '\n'
+                 , (mes,res)      <- (tail ds) `till` '\r'
                  , (length nic) <= 18 ]
               ++ [ (NICK nic usr hst mes, res)
                  | (":",zs)       <- [splitAt 1 s]
@@ -157,7 +157,7 @@ readMessage s =  [ (PING hst, res)
                  , (usr,bs)       <- as `till` '@'
                  , (hst,cs)       <- bs `till` ' '
                  , ("NICK",ds)    <- cs `till` ' '
-                 , (mes,res)      <- (tail ds) `till` '\n'
+                 , (mes,res)      <- (tail ds) `till` '\r'
                  , (length nic) <= 18 ]
 
 till :: Eq a => [a] -> a -> [([a], [a])]
