@@ -2,3 +2,7 @@ Secrets.hs
 Commands.hs
 logs/*
 TODO
+*.o
+*.hi
+*.swp
+RaBot

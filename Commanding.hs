@@ -52,7 +52,7 @@ tryCommand m@(PRIVMSG nic usr hst chn mes) command
     copesetic  = authorized && triggered && stated
     authorized = checkAclList m (auth command)
     triggered  = all (flip trig messg) (trigger command)
-    (a,b,c)    = (mes =~ ("(^"++botNick++" |^"++attChar++" )") :: (String, String, String))
+    (a,b,c)    = (mes =~ ("(^"++botNick++"[:]? |^"++attChar++" )") :: (String, String, String))
     st         = not $ null b
     messg      = if st then c else a
     stated     = checkState st (state command)
