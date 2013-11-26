@@ -5,6 +5,7 @@ import Control.Monad
 import Control.Monad.Trans.State
 import Control.Monad.IO.Class
 import Data.List
+import Data.Time.Clock
 import Messaging
 import Network
 import Secrets
@@ -164,13 +165,38 @@ addUser c n ((a,b):xs)
 
 getUsers _ []   = []
 getUsers c ((a,b):xs)
-    | a == c    = b
+    | a == c    = map unPingafy b
     | otherwise = getUsers c xs
 
 renameUser o n []         = []
 renameUser o n ((a,b):xs)
     | o `elem` b = (a, (n:b) \\ [o]) : renameUser o n xs
     | otherwise  = (a,b) : renameUser o n xs
+
+unPingafy []       = []
+unPingafy ('a':xs) = '@' : unPingafy xs
+unPingafy ('A':xs) = '4' : unPingafy xs
+unPingafy ('e':xs) = '3' : unPingafy xs
+unPingafy ('E':xs) = '3' : unPingafy xs
+unPingafy ('i':xs) = '1' : unPingafy xs
+unPingafy ('I':xs) = '1' : unPingafy xs
+unPingafy ('o':xs) = '0' : unPingafy xs
+unPingafy ('O':xs) = '0' : unPingafy xs
+unPingafy ('l':xs) = '1' : unPingafy xs
+unPingafy ('L':xs) = '1' : unPingafy xs
+unPingafy (x:xs)   = x : unPingafy xs
+
+throttle = io $ do
+    t <- getCurrentTime
+    throttle' t
+throttle' x = do
+    t <- getCurrentTime
+    let diff = diffUTCTime t x
+        res  = show diff
+    case compare diff (fromRational 0.5) of
+         LT -> throttle' x
+         _  -> return ()
+
 -- -----------------------------------------------------------------------------------------------------------------
 -- IO funtions
 -- Varios functions that perform IO functions including io which lifts IO into the Bot monad
@@ -185,6 +211,7 @@ say :: Response_Type -> String -> String -> StateT BotState IO b
 say rt chn mes = do
     bs <- get
     let h = handle bs
+    throttle
     io $ case rt of
         Privmsg -> hPrintf h "PRIVMSG %s :%s\r\n" chn mes
         Notice  -> hPrintf h "NOTICE %s :%s\r\n" chn mes
