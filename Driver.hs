@@ -1,5 +1,7 @@
 module Driver where
 
+import Actions
+import Authorization
 import Commanding
 import Control.Monad
 import Control.Monad.Trans.State
