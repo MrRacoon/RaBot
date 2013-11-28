@@ -12,11 +12,14 @@ data C_Trigger = AllMessages
                | FirstWord String
                | WordPresent String
                | EntireMessage String
+               | EmptyMessage
     deriving (Show,Read,Eq)
 
-trig :: C_Trigger -> (String -> Bool)
-trig AllMessages      = const True
-trig (FirstWord w)    = (==w) . head . words
-trig (WordPresent w)  = (elem w) . words
-trig (EntireMessage r) = (r==)
-
+trig :: C_Trigger -> String -> Bool
+trig EmptyMessage      [] = True
+trig _                 [] = False
+trig AllMessages       m  = True
+trig (FirstWord w)     m  = (w==) $ head $ words m
+trig (WordPresent w)   m  = elem w $ words m
+trig (EntireMessage r) m  = r == m
+trig _                 _  = False
