@@ -72,8 +72,8 @@ interpretServ _ = []
 
 readInCommands :: IO (Maybe [Command])
 readInCommands = do
-    file <- readFile commandFile
-    let clean  = filter ((/=';') . head) $ filter (not . null) $ lines file
+    file <- readFile commandDir
+    let clean  = map rmComments $ filter (not . null) $ lines file
         cleanr = unwords $ words $ unwords clean
         coms   = read cleanr :: [Command]
     return $ getCommands cleanr
@@ -94,4 +94,8 @@ accumulateCommands save next = case reads next :: [(Command,String)] of
                                  [(c,[])]  -> Just $ reverse (c:save)
                                  [(c,r)]   -> accumulateCommands (c:save) r
                                  []        -> error next
+
+rmComments []           = []
+rmComments ('-':'-':xs) = []
+rmComments (x:xs)       = x : (rmComments xs)
 

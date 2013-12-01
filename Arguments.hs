@@ -52,5 +52,5 @@ resolveArg message WholeMessage      = mess message
 resolveArg message AllFields         = show message
 resolveArg message (KarmaUP a)       = (++"++") $ resolveArg message a
 resolveArg message (KarmaDOWN a)     = (++"--") $ resolveArg message a
-resolveArg _       SourceUrl         = repo
+resolveArg _       SourceUrl         = "https://github.com/MrRacoon/RaBot.git"
 

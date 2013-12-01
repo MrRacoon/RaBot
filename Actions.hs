@@ -30,6 +30,7 @@ data C_Action = Respond Response_Type [Argument] Destination
               | HelpUsageListAll
               | HelpDescriptionListAll
               | ShowCurrentUsers
+              | RunScript String [Argument] Destination
     deriving (Show,Read)
 
 -- ------------------------------------------------------------------------------------------------------------------
@@ -55,6 +56,7 @@ data BotAction = Ping String
                | UserPart String String
                | UserNick String String
                | ShowUsers String
+               | Script String [String] String
                | Not_a_command
     deriving (Show,Read,Eq)
 
@@ -72,6 +74,7 @@ makeAction message HelpUsageListAll             = DisplayHelp message 2 True
 makeAction message HelpDescriptionList          = DisplayHelp message 3 False
 makeAction message HelpDescriptionListAll       = DisplayHelp message 3 True
 makeAction message ShowCurrentUsers             = ShowUsers (chan message)
+makeAction message (RunScript bin args dest)    = Script bin (map (resolveArg message) args) (makeDestination message dest)
 
 loadable (SayToServer Privmsg _ _) = True
 loadable (SayToTerm _)             = True

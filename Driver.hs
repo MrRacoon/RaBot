@@ -12,7 +12,9 @@ import Messaging
 import Network
 import Secrets
 import System.Directory
+import System.Exit
 import System.IO
+import System.Process(readProcessWithExitCode)
 import Text.Printf
 import Text.Regex.TDFA
 
@@ -21,11 +23,10 @@ import Text.Regex.TDFA
 -- dataTypes
 --
 
-data BotState = BotState { server   :: String
-                         , port     :: Integer
+data BotState = BotState { nickname :: String
                          , handle   :: Handle
-                         , channels :: String
-                         , nickname :: String
+                         , server   :: String
+                         , port     :: Integer
                          , lobbys   :: [(String,[String])]
                          , commands :: [Command]
                          , payload  :: [BotAction] }
@@ -39,14 +40,15 @@ type Bot = StateT BotState IO
 --
 drive = do
       coms <- readInCommands
-      h <- connectTo botServer (PortNumber (fromIntegral botPort))
+      h <- connectTo ircServer (PortNumber (fromIntegral ircPort))
       hSetBuffering h NoBuffering
       write h "NICK" $ botNick
-      write h "USER" (botNick++" 0 * :"++botDesc)
-      write h "JOIN" initChan
+      write h "USER" (botNick++" 0 * :"++botOwnerNick++"'s bot")
+      mapM (write h "JOIN") botChans
+      let lobs = map (\x -> (x,[])) botChans
       case coms of
           Nothing   -> error "Could not parse the command File...Exiting."
-          Just coms -> runStateT listen $ BotState botServer botPort h initChan botNick [] coms []
+          Just coms -> runStateT listen $ BotState botNick h ircServer ircPort lobs coms []
 
 -- -----------------------------------------------------------------------------------------------------------------
 -- Listen Command that is going to run the bot forever or until completion
@@ -77,12 +79,12 @@ evalCommand (Reload chan)              = do
       case new of
         Right c -> do say Privmsg chan "Successfully reloaded :)" >> put (bs {commands = c})
         Left  c -> do say Privmsg chan "Reload Failed :(" >> put (bs {commands = c})
-evalCommand (Log [loc] line) = io $ appendFile (logFolder++"/"++loc) (line++"\n")
+evalCommand (Log [loc] line) = io $ appendFile (logDir++"/"++loc) (line++"\n")
 evalCommand (Log loc   line) = do
       io $ createDirectoryIfMissing True dir
       io $ appendFile (dir++"/"++file) (line++"\n")
   where
-      dir  = (logFolder++) $ concat $ intersperse "/" $ init loc
+      dir  = (logDir++) $ concat $ intersperse "/" $ init loc
       file = last loc
 evalCommand CannonRequest         = return ()
 evalCommand (LoadPayload actions) = do
@@ -147,6 +149,9 @@ evalCommand (ShowUsers c) = do
       let lo = lobbys bs
           ln = getUsers c lo
       say Privmsg c $ unwords ln
+      return ()
+evalCommand (Script bin args chan) = do
+      runScript bin args chan
       return ()
 evalCommand not_a_command = do
       io $ printf "Could not execute: $s" $ show not_a_command
@@ -229,6 +234,21 @@ notice chn mes = do
     case chn of
         [] -> io $ printf "attempted to notify without specifying channel\n"
         _  -> io $ hPrintf h "NOTICE %s :%s\r\n" chn mes
+
+runScript bin args chan = do
+    (ec,out,err) <- io $ readProcessWithExitCode bin args []
+    let output = map unwords $ map words $ lines out
+        errors = map unwords $ map words $ lines ("ERROR OCCURED\n"++err)
+    case ec of
+        ExitSuccess -> mapM (say Privmsg chan) output >> return ()
+        _           -> mapM (say Privmsg chan) errors >> return ()
+
+trimOut x = trimOutput ([],x)
+trimOutput ([],[]) = []
+trimOutput (x,[]) = [x]
+trimOutput ([],x) = trimOutput $ splitAt 60 x
+trimOutput (x,xs) = x : (trimOutput $ splitAt 60 x)
+
 
 io :: IO a -> Bot a
 io = liftIO

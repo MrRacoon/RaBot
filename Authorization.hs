@@ -18,7 +18,7 @@ data ACL = ACL_N
          | ACL_S Authorization Authorization Authorization
     deriving (Show,Read,Eq)
 
-checkAclList  message []        = checkAcl message (ACL_M (Auth_Nick ownerNick) (Auth_User ownerUser))
+checkAclList  message []        = checkAcl message (ACL_M (Auth_Nick botOwnerNick) (Auth_User botOwnerUser))
 checkAclList  message list      = checkAclList' message list
 checkAclList' message (x:xs)    = (checkAcl message x) || (checkAclList' message xs)
 
