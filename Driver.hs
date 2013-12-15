@@ -1,6 +1,5 @@
 module Driver where
 
-import Actions
 import Authorization
 import Commanding
 import Config
@@ -13,33 +12,18 @@ import Data.Time.Clock
 import InitialConfig
 import Messaging
 import Network
-import Secrets
 import System.Directory
 import System.Exit
 import System.IO
 import System.Process(readProcessWithExitCode)
 import Text.Printf
 import Text.Regex.TDFA
+import Types
 
 
 -- ---------------------------------------------------------------------
 -- dataTypes
 --
-data BotState = BotState { nickname  :: String
-                         , attChar   :: String
-                         , ownerNick :: String
-                         , ownerUser :: String
-                         , server    :: String
-                         , port      :: String
-                         , lobbys    :: [(String,[String])]
-                         , commands  :: [Command]
-                         , comFile   :: String
-                         , scptDir   :: String
-                         , logsDir   :: String
-                         , payload   :: [BotAction]
-                         , handle    :: Handle }
-          deriving (Show)
-
 type Bot = StateT BotState IO
 
 -- -----------------------------------------------------------------------------------------------------------------
@@ -68,7 +52,7 @@ readInCommands file = do
     file <- readFile file
     let clean  = map rmComments $ filter (not . null) $ lines file
         cleanr = unwords $ words $ unwords clean
-    return $ getCommands cleanr
+        in return $ getCommands cleanr
 
 reloadCommands :: String -> [Command] -> IO (Either [Command] [Command])
 reloadCommands file last = do
@@ -98,12 +82,14 @@ listen :: Bot a
 listen  = forever $ do
       bs <- get
       let h = handle bs
-      line <- io $ hGetLine h
-      let parsed = parse line
-          coms   = parseCommands parsed (commands bs)
-      io $ putStrLn ""
-      mapM evalCommand coms
-      mapM (io . putStrLn . ("Triggered: "++) . show) coms
+          in do
+            line <- io $ hGetLine h
+            let parsed = parse line
+                coms   = parseCommands bs parsed (commands bs)
+                in do
+                  io $ putStrLn ""
+                  mapM evalCommand coms
+                  mapM (io . putStrLn . ("Triggered: "++) . show) coms
   where
       forever a = do a; forever a
 
@@ -120,13 +106,16 @@ evalCommand (Reload chan)              = do
       case new of
         Right c -> do say Privmsg chan "Successfully reloaded :)" >> put (bs {commands = c})
         Left  c -> do say Privmsg chan "Reload Failed :(" >> put (bs {commands = c})
-evalCommand (Log [loc] line) = io $ appendFile (logDir++"/"++loc) (line++"\n")
+evalCommand (Log [loc] line) = do 
+      bs <- get
+      io $ appendFile ((logsDir bs)++"/"++loc) (line++"\n")
 evalCommand (Log loc   line) = do
-      io $ createDirectoryIfMissing True dir
-      io $ appendFile (dir++"/"++file) (line++"\n")
-  where
-      dir  = (logDir++) $ concat $ intersperse "/" $ init loc
-      file = last loc
+      bs <- get
+      let dir  = ((logsDir bs)++) $ concat $ intersperse "/" $ init loc
+          file = last loc
+          in do
+            io $ createDirectoryIfMissing True dir
+            io $ appendFile (dir++"/"++file) (line++"\n")
 evalCommand CannonRequest         = return ()
 evalCommand (LoadPayload actions) = do
       bs <- get

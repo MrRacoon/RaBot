@@ -1,32 +1,7 @@
 module Messaging where
 
-import Secrets
 import Test.QuickCheck
--- ------------------------------------------------------------------
--- Types
---
-type Nick = String
-type User = String
-type Host = String
-type Chan = String
-type Mess = String
-type Code = String
-
-data NICKNAME = NICKNAME
--- ------------------------------------------------------------------
--- Message
--- Every IRC Message will be parsed in at least one of the following.
---
-data Message = PRIVMSG Nick User Host Chan Mess
-             | JOIN Nick User Host Chan
-             | PART Nick User Host Chan
-             | QUIT Nick User Host Mess
-             | NICK Nick User Host Nick
-             | PING Host
-             | SERV Host Code Nick Mess
-             | UNKNOWN String
-    deriving (Show,Read,Eq)
-
+import Types
 -- ------------------------------------------------------------------
 -- IRC Class
 -- Functions that can be applied to any of the Message types.
@@ -116,7 +91,6 @@ readMessage s =  [ (PING hst, res)
                  , (cde,bs)       <- as `till` ' '
                  , (nic,cs)       <- bs `till` ' '
                  , (mes,res)      <- (tail cs) `till` '\r'
-                 , nic == botNick
                  , (length cde) == 3 ]
               ++ [ (PRIVMSG nic usr hst chn mes, res)
                  | (":",zs)       <- [splitAt 1 s]
@@ -198,7 +172,7 @@ instance Arbitrary Message where
         3 -> QUIT a b c e
         4 -> NICK a b c g
         5 -> PING c
-        6 -> SERV c f botNick h
+        6 -> SERV c f "botsNick" h
 
 letters = (['a'..'z']++['A'..'Z']) :: [Char]
 numbers :: [Char]

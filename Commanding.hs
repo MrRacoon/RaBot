@@ -6,39 +6,20 @@ import Actions
 import Arguments
 import Authorization
 import Messaging
-import Secrets
 import States
 import Text.Regex.TDFA
 import Triggers
+import Types
 
 
--- ------------------------------------------------------------------------------------------------------------------
--- The Configurable Command structure
--- The commands will essentially take this form in the command file
---    name    -> name of the command, should be unique
---    state   -> Single state for the command
---    auth    -> List of users that may use the command
---    usage   -> A string detailing how to use the command
---    desc    -> A description of what the command does
---    trigger -> A list of triggers in which all must be true for the command
---    action  -> A list of actions that the command will do to fullfill its life
---
-data Command = Command { name    :: String
-                       , state   :: C_State
-                       , auth    :: [ACL]
-                       , usage   :: String
-                       , desc    :: String
-                       , trigger :: [C_Trigger]
-                       , action  :: [C_Action] }
-    deriving (Show,Read)
 
 --parseCommands :: Message -> [Command] -> Maybe [BotAction]
-parseCommands :: Message -> [Command] -> [BotAction]
-parseCommands mes com
+parseCommands :: BotState -> Message -> [Command] -> [BotAction]
+parseCommands botState mes com
      = let always  = [SayToTerm (show mes)]
        in (always++) $ case mes of
           (PING h)            -> [SayToServer Raw "" ("PONG :"++h), SayToTerm ("PONGED: "++h)]
-          (PRIVMSG a b c d e) -> checkCannonRequest d $ concatMap (tryCommand mes) com
+          (PRIVMSG a b c d e) -> checkCannonRequest d $ concatMap (tryCommand botState mes) com
           (JOIN a b c d)      -> [UserAdd d a]
           (PART a b c d)      -> [UserPart d a]
           (QUIT a b c d)      -> [UserQuit a]
@@ -47,15 +28,15 @@ parseCommands mes com
           _        -> []
 
 
-tryCommand :: Message -> Command -> [BotAction]
-tryCommand m@(PRIVMSG nic usr hst chn mes) command
+tryCommand :: BotState -> Message -> Command -> [BotAction]
+tryCommand botState m@(PRIVMSG nic usr hst chn mes) command
     | copesetic = map (makeAction (PRIVMSG nic usr hst chn messg)) (action command)
     | otherwise = []
   where
     copesetic  = authorized && triggered && stated
-    authorized = checkAclList m (auth command)
+    authorized = checkAclList m $ (ACL_M (Auth_Nick $ ownerNick botState) (Auth_User $ ownerNick botState)) : auth command
     triggered  = all (flip trig messg) (trigger command)
-    (a,b,c)    = (mes =~ ("(^"++botNick++"[:]? |^"++attChar++" )") :: (String, String, String))
+    (a,b,c)    = (mes =~ ("(^"++(nickname botState)++"[:]? |^"++(attChar botState)++" )") :: (String, String, String))
     st         = not $ null b
     messg      = if st then c else a
     stated     = checkState st (state command)
