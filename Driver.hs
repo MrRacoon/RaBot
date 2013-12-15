@@ -104,8 +104,8 @@ evalCommand (Reload chan)              = do
       bs  <- get
       new <- io $ reloadCommands (comFile bs) $ commands bs
       case new of
-        Right c -> do say Privmsg chan "Successfully reloaded :)" >> put (bs {commands = c})
-        Left  c -> do say Privmsg chan "Reload Failed :(" >> put (bs {commands = c})
+        Right c -> do say Notice chan "Successfully reloaded" >> put (bs {commands = c})
+        Left  c -> do say Notice chan "Reload Failed" >> put (bs {commands = c})
 evalCommand (Log [loc] line) = do 
       bs <- get
       io $ appendFile ((logsDir bs)++"/"++loc) (line++"\n")
@@ -135,9 +135,10 @@ evalCommand (FirePayload) = do
 evalCommand (DisplayHelp mess typ all) = do
       bs <- get
       let comms = filter (not . null . name) $ commands bs
+          owner = ACL_M (Auth_Nick $ ownerNick bs) (Auth_User $ ownerUser bs)
           tshow = case all of
                     True  -> comms
-                    False -> filter (\x -> checkAclList mess (auth x)) comms
+                    False -> filter (\x -> checkAclList mess $ owner : auth x) comms
           msgs  = case typ of
                     1 -> let names = unwords $ map name tshow
                              in [SayToServer Privmsg (chan mess) ("Commands: "++names) ]
@@ -181,7 +182,8 @@ evalCommand (ShowUsers c) = do
       say Privmsg c $ unwords ln
       return ()
 evalCommand (Script bin args chan) = do
-      runScript bin args chan
+      bs <- get
+      runScript (scptDir bs ++"/"++ bin) args chan
       return ()
 evalCommand not_a_command = do
       io $ printf "Could not execute: $s" $ show not_a_command
@@ -248,14 +250,15 @@ say :: Response_Type -> String -> String -> StateT BotState IO b
 say rt chn mes = do
     bs <- get
     let h = handle bs
+        m = unicodeToUtf8 mes
     throttle
     io $ case rt of
-        Privmsg -> hPrintf h "PRIVMSG %s :%s\r\n" chn mes
-        Notice  -> hPrintf h "NOTICE %s :%s\r\n" chn mes
-        Join    -> hPrintf h "JOIN %s\r\n" mes
-        Part    -> hPrintf h "PART %s :parting\r\n" mes
-        Quit    -> hPrintf h "QUIT :%s\r\n" mes
-        _       -> hPrintf h "%s\r\n" mes
+        Privmsg -> hPrintf h "PRIVMSG %s :%s\r\n" chn m
+        Notice  -> hPrintf h "NOTICE %s :%s\r\n" chn m
+        Join    -> hPrintf h "JOIN %s\r\n" m
+        Part    -> hPrintf h "PART %s :parting\r\n" m
+        Quit    -> hPrintf h "QUIT :%s\r\n" m
+        _       -> hPrintf h "%s\r\n" m
 
 notice :: String -> String -> StateT BotState IO b
 notice chn mes = do
@@ -270,7 +273,7 @@ runScript bin args chan = do
     let output = map unwords $ map words $ lines out
         errors = map unwords $ map words $ lines ("ERROR OCCURED:\n"++err)
     case ec of
-        ExitSuccess -> (mapM (say Privmsg chan) $ map unicodeToUtf8 output) >> return ()
+        ExitSuccess -> (mapM (say Privmsg chan) output) >> return ()
         _           -> mapM (say Privmsg chan) errors >> return ()
 
 trimOut x = trimOutput ([],x)

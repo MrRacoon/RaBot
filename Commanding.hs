@@ -34,7 +34,7 @@ tryCommand botState m@(PRIVMSG nic usr hst chn mes) command
     | otherwise = []
   where
     copesetic  = authorized && triggered && stated
-    authorized = checkAclList m $ (ACL_M (Auth_Nick $ ownerNick botState) (Auth_User $ ownerNick botState)) : auth command
+    authorized = checkAclList m $ (ACL_M (Auth_Nick $ ownerNick botState) (Auth_User $ ownerUser botState)) : auth command
     triggered  = all (flip trig messg) (trigger command)
     (a,b,c)    = (mes =~ ("(^"++(nickname botState)++"[:]? |^"++(attChar botState)++" )") :: (String, String, String))
     st         = not $ null b

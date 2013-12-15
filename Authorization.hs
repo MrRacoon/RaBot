@@ -5,14 +5,14 @@ import Messaging
 import Types
 
 
-checkAclList  message []        = False
-checkAclList  message list      = checkAclList' message list
-checkAclList' message (x:xs)    = (checkAcl message x) || (checkAclList' message xs)
+checkAclList  message list   = checkAclList' message list
+checkAclList' _       []     = False
+checkAclList' message (x:xs) = (checkAcl message x) || (checkAclList' message xs)
 
 checkAcl message ACL_N         = True
 checkAcl message (ACL_W a)     = (authed message a)
-checkAcl message (ACL_M a b)   = (authed message a) && (authed message b)
-checkAcl message (ACL_S a b c) = (authed message a) && (authed message b) && (authed message c)
+checkAcl message (ACL_M a b)   = all (authed message) [a,b]
+checkAcl message (ACL_S a b c) = all (authed message) [a,b,c]
 
 
 authed message (Auth_Nick n) = n == (nick message)
