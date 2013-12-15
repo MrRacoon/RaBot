@@ -42,7 +42,7 @@ resolveArg message (Literal s)       = s
 resolveArg message (WordAfter r)     = let (_,_,a) = (mess message) =~ r :: (String, String, String)
                                         in head $ words a
 resolveArg message (AllWordsAfter r) = let (_,_,a) = (mess message) =~ r :: (String, String, String)
-                                        in tail a
+                                        in drop 1 a
 resolveArg message Nickname          = nick message
 resolveArg message Username          = user message
 resolveArg message FirstChannel      = (mess message) =~ "#[^ ]*" :: String

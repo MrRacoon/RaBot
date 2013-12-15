@@ -75,7 +75,6 @@ readInCommands = do
     file <- readFile commandDir
     let clean  = map rmComments $ filter (not . null) $ lines file
         cleanr = unwords $ words $ unwords clean
-        coms   = read cleanr :: [Command]
     return $ getCommands cleanr
 
 reloadCommands :: [Command] -> IO (Either [Command] [Command])

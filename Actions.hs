@@ -74,7 +74,7 @@ makeAction message HelpUsageListAll             = DisplayHelp message 2 True
 makeAction message HelpDescriptionList          = DisplayHelp message 3 False
 makeAction message HelpDescriptionListAll       = DisplayHelp message 3 True
 makeAction message ShowCurrentUsers             = ShowUsers (chan message)
-makeAction message (RunScript bin args dest)    = Script bin (map (resolveArg message) args) (makeDestination message dest)
+makeAction message (RunScript bin args dest)    = Script bin (concatMap words $ map (resolveArg message) args) (makeDestination message dest)
 
 loadable (SayToServer Privmsg _ _) = True
 loadable (SayToTerm _)             = True

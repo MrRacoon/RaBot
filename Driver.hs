@@ -7,6 +7,7 @@ import Control.Monad
 import Control.Monad.Trans.State
 import Control.Monad.IO.Class
 import Data.List
+import Data.String.Unicode
 import Data.Time.Clock
 import Messaging
 import Network
@@ -238,9 +239,9 @@ notice chn mes = do
 runScript bin args chan = do
     (ec,out,err) <- io $ readProcessWithExitCode bin args []
     let output = map unwords $ map words $ lines out
-        errors = map unwords $ map words $ lines ("ERROR OCCURED\n"++err)
+        errors = map unwords $ map words $ lines ("ERROR OCCURED:\n"++err)
     case ec of
-        ExitSuccess -> mapM (say Privmsg chan) output >> return ()
+        ExitSuccess -> (mapM (say Privmsg chan) $ map unicodeToUtf8 output) >> return ()
         _           -> mapM (say Privmsg chan) errors >> return ()
 
 trimOut x = trimOutput ([],x)
