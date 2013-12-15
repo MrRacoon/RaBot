@@ -66,35 +66,3 @@ interpretServ (SERV a "353" c d) = let (chan:nics) = words d
                                    in map (UserAdd chan) list
 interpretServ _ = []
 
--- ------------------------------------------------------------------------------------------------------------------
--- Fileparsing of commands
--- Read in the commands from the designated file
-
-readInCommands :: IO (Maybe [Command])
-readInCommands = do
-    file <- readFile commandDir
-    let clean  = map rmComments $ filter (not . null) $ lines file
-        cleanr = unwords $ words $ unwords clean
-    return $ getCommands cleanr
-
-reloadCommands :: [Command] -> IO (Either [Command] [Command])
-reloadCommands last = do
-    rel <- readInCommands
-    return $ case rel of
-      Just new  -> Right new
-      Nothing   -> Left last
-
-getCommands :: String -> Maybe [Command]
-getCommands = accumulateCommands []
-
-accumulateCommands :: [Command] -> String -> Maybe [Command]
-accumulateCommands save []   = Just (save)
-accumulateCommands save next = case reads next :: [(Command,String)] of
-                                 [(c,[])]  -> Just $ reverse (c:save)
-                                 [(c,r)]   -> accumulateCommands (c:save) r
-                                 []        -> error next
-
-rmComments []           = []
-rmComments ('-':'-':xs) = []
-rmComments (x:xs)       = x : (rmComments xs)
-

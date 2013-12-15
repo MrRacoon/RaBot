@@ -3,12 +3,14 @@ module Driver where
 import Actions
 import Authorization
 import Commanding
+import Config
 import Control.Monad
 import Control.Monad.Trans.State
 import Control.Monad.IO.Class
 import Data.List
 import Data.String.Unicode
 import Data.Time.Clock
+import InitialConfig
 import Messaging
 import Network
 import Secrets
@@ -23,14 +25,19 @@ import Text.Regex.TDFA
 -- ---------------------------------------------------------------------
 -- dataTypes
 --
-
-data BotState = BotState { nickname :: String
-                         , handle   :: Handle
-                         , server   :: String
-                         , port     :: Integer
-                         , lobbys   :: [(String,[String])]
-                         , commands :: [Command]
-                         , payload  :: [BotAction] }
+data BotState = BotState { nickname  :: String
+                         , attChar   :: String
+                         , ownerNick :: String
+                         , ownerUser :: String
+                         , server    :: String
+                         , port      :: String
+                         , lobbys    :: [(String,[String])]
+                         , commands  :: [Command]
+                         , comFile   :: String
+                         , scptDir   :: String
+                         , logsDir   :: String
+                         , payload   :: [BotAction]
+                         , handle    :: Handle }
           deriving (Show)
 
 type Bot = StateT BotState IO
@@ -39,17 +46,50 @@ type Bot = StateT BotState IO
 -- Main Driver
 -- Performs the initialization of the bot
 --
-drive = do
-      coms <- readInCommands
-      h <- connectTo ircServer (PortNumber (fromIntegral ircPort))
-      hSetBuffering h NoBuffering
-      write h "NICK" $ botNick
-      write h "USER" (botNick++" 0 * :"++botOwnerNick++"'s bot")
-      mapM (write h "JOIN") botChans
-      let lobs = map (\x -> (x,[])) botChans
-      case coms of
-          Nothing   -> error "Could not parse the command File...Exiting."
-          Just coms -> runStateT listen $ BotState botNick h ircServer ircPort lobs coms []
+drive args = let (BotConfig ni at on ou sv pt ch co lo sc) = resolveArguments initialConfig args
+             in do
+                coms <- readInCommands co
+                h    <- connectTo sv $ PortNumber $ fromInteger $ (read pt :: Integer)
+                let lobs = map (\x -> (x,[])) ch
+                hSetBuffering h NoBuffering
+                write h "NICK" ni
+                write h "USER" (ni++" 0 * :"++on++"'s bot")
+                mapM (write h "JOIN") ch
+                case coms of
+                    Nothing   -> error "Could not parse the command File...Exiting."
+                    Just coms -> runStateT listen $ BotState ni at on ou sv pt lobs coms co sc lo [] h
+
+-- ------------------------------------------------------------------------------------------------------------------
+-- Fileparsing of commands
+-- Read in the commands from the designated file
+
+readInCommands :: String -> IO (Maybe [Command])
+readInCommands file = do
+    file <- readFile file
+    let clean  = map rmComments $ filter (not . null) $ lines file
+        cleanr = unwords $ words $ unwords clean
+    return $ getCommands cleanr
+
+reloadCommands :: String -> [Command] -> IO (Either [Command] [Command])
+reloadCommands file last = do
+    rel <- readInCommands file
+    return $ case rel of
+      Just new  -> Right new
+      Nothing   -> Left last
+
+getCommands :: String -> Maybe [Command]
+getCommands = accumulateCommands []
+
+accumulateCommands :: [Command] -> String -> Maybe [Command]
+accumulateCommands save []   = Just (save)
+accumulateCommands save next = case reads next :: [(Command,String)] of
+                                 [(c,[])]  -> Just $ reverse (c:save)
+                                 [(c,r)]   -> accumulateCommands (c:save) r
+                                 []        -> error next
+
+rmComments []           = []
+rmComments ('-':'-':xs) = []
+rmComments (x:xs)       = x : (rmComments xs)
 
 -- -----------------------------------------------------------------------------------------------------------------
 -- Listen Command that is going to run the bot forever or until completion
@@ -76,7 +116,7 @@ evalCommand (SayToServer rt chan mess) = say rt chan mess
 evalCommand (SayToTerm str)            = io $ putStrLn str
 evalCommand (Reload chan)              = do
       bs  <- get
-      new <- io $ reloadCommands (commands bs)
+      new <- io $ reloadCommands (comFile bs) $ commands bs
       case new of
         Right c -> do say Privmsg chan "Successfully reloaded :)" >> put (bs {commands = c})
         Left  c -> do say Privmsg chan "Reload Failed :(" >> put (bs {commands = c})
