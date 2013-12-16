@@ -48,7 +48,7 @@ data BotState = BotState { nickname  :: String
                          , port      :: String
                          , lobbys    :: [(String,[String])]
                          , commands  :: [Command]
-                         , comFile   :: String
+                         , comDir    :: String
                          , scptDir   :: String
                          , logsDir   :: String
                          , payload   :: [BotAction]

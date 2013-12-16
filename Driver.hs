@@ -5,13 +5,14 @@ import Commanding(parseCommands)
 import Config(BotConfig(..))
 import Control.Monad.Trans.State(put,get,StateT(..))
 import Control.Monad.IO.Class(liftIO)
+import Data.Either(lefts,rights)
 import Data.List(intersperse, (\\))
 import Data.String.Unicode(unicodeToUtf8)
 import Data.Time.Clock(getCurrentTime, diffUTCTime)
 import InitialConfig(initialConfig)
 import Messaging(IRC(..), parse)
 import Network(connectTo, PortID(..))
-import System.Directory(createDirectoryIfMissing)
+import System.Directory(createDirectoryIfMissing, getDirectoryContents)
 import System.Exit(ExitCode(..))
 import System.IO(hSetBuffering, hGetLine, Handle(..), BufferMode(..))
 import System.Process(readProcessWithExitCode)
@@ -30,48 +31,60 @@ type Bot = StateT BotState IO
 -- Performs the initialization of the bot
 --
 drive (BotConfig ni at on ou sv pt ch co lo sc) = do
-  coms <- readInCommands co
+  (errs,suc) <- loadCommandDir co
   h    <- connectTo sv $ PortNumber $ fromInteger $ (read pt :: Integer)
   let lobs = map (\x -> (x,[])) ch
+      coms = concatMap snd suc
+      bs   = BotState ni at on ou sv pt lobs coms co sc lo [] h
   hSetBuffering h NoBuffering
   write h "NICK" ni
   write h "USER" (ni++" 0 * :"++on++"'s bot")
   mapM (write h "JOIN") ch
-  case coms of
-    Nothing   -> error "Could not parse the command File...Exiting."
-    Just coms -> runStateT listen $ BotState ni at on ou sv pt lobs coms co sc lo [] h
+  --case coms of
+  --  Nothing   -> error "Could not parse the command File...Exiting."
+  --  Just coms -> runStateT listen $ BotState ni at on ou sv pt lobs coms co sc lo [] h
+  runStateT listen bs
 
 -- ------------------------------------------------------------------------------------------------------------------
 -- Fileparsing of commands
+--
 -- Read in the commands from the designated file
 
-reloadCommands :: String -> [Command] -> IO (Either [Command] [Command])
-reloadCommands file last = do
-  rel <- readInCommands file
-  return $ case rel of
-             Just new  -> Right new
-             Nothing   -> Left last
+loadCommandDir path = do
+    files <- getDirectoryContents path
+    let comFiles = filter ((=="sh.") . take 3 . reverse ) $ map ((path++"/")++) files
+        in do
+          comAttempts <- mapM loadCommandsFromFile comFiles
+          let r = rights comAttempts
+              l = lefts comAttempts
+              in return (l,r)
 
-readInCommands :: String -> IO (Maybe [Command])
+loadCommandsFromFile file = do
+    rel <- readInCommands file
+    case rel of
+      (f,Right new) -> putStrLn ("Loaded Commands From: "++f) >> (return $ Right (f,new))
+      (f, Left err) -> putStrLn (errString err) >> (return $ Left $ (f,errString err))
+  where errString error = "FILE PARSE FAILD: "++file++" on "++(take 30 error)++".."
+
 readInCommands file = do
-    file <- readFile file
-    let clean  = map rmComments $ filter (not . null) $ lines file
-        cleanr = unwords $ words $ unwords clean
-        in return $ getCommands cleanr
+    files <- readFile file
+    let clean  = (map rmComments . filter (not . null) . lines) files
+        cleanr = (unwords . words . unwords) clean
+        coms   = getCommands cleanr
+        in return (file, coms)
+  where
+    rmComments []           = []
+    rmComments ('-':'-':xs) = []
+    rmComments (x:xs)       = x : (rmComments xs)
 
-getCommands :: String -> Maybe [Command]
 getCommands = accumulateCommands []
 
-accumulateCommands :: [Command] -> String -> Maybe [Command]
-accumulateCommands save []   = Just (save)
+accumulateCommands save []   = Right []
 accumulateCommands save next = case reads next :: [(Command,String)] of
-                                 [(c,[])]  -> Just $ reverse (c:save)
+                                 [(c,[])]  -> Right $ reverse (c:save)
                                  [(c,r)]   -> accumulateCommands (c:save) r
-                                 []        -> error next
+                                 []        -> Left next
 
-rmComments []           = []
-rmComments ('-':'-':xs) = []
-rmComments (x:xs)       = x : (rmComments xs)
 
 {-
 reload = do
@@ -105,11 +118,12 @@ listen  = forever $ do
 evalCommand (SayToServer rt chan mess) = say rt chan mess
 evalCommand (SayToTerm str)            = io $ putStrLn str
 evalCommand (Reload chan)              = do
-      bs  <- get
-      new <- io $ reloadCommands (comFile bs) $ commands bs
-      case new of
-        Right c -> do say Notice chan "Successfully reloaded" >> put (bs {commands = c})
-        Left  c -> do say Notice chan "Reload Failed" >> put (bs {commands = c})
+      bs <- get
+      (ers,sucs) <- io $ loadCommandDir $ comDir bs
+      mapM (\(f,c) -> say Notice chan $ ("Loaded: "++f)) sucs
+      mapM (\(f,e) -> say Notice chan e) ers
+      put $ bs { commands = (concatMap snd sucs) }
+
 evalCommand (Log [loc] line) = do 
       bs <- get
       io $ appendFile ((logsDir bs)++"/"++loc) (line++"\n")

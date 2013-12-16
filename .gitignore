@@ -3,6 +3,7 @@ Secrets.hs
 Commands.hs
 logs/*
 scripts/*
+commands/Commands.hs
 TODO
 *.o
 *.hi

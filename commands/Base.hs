@@ -26,7 +26,7 @@ Command { name    = "join"
         , action  = [Respond Join [AllWordsAfter "join"] To_Server ] }
 
 --
--- Have the bot leave the curent channel
+-- Have the bot leave a channel
 --
 Command { name    = "leave"
         , state   = Active
@@ -57,64 +57,6 @@ Command { name    = "part"
         , desc    = "leave a channel"
         , trigger = [WordPresent "part"]
         , action  = [Respond Part [WordAfter "part"] To_Server ] }
-
---
--- Simply have the bot repeat everything after the word 'say'
---
-Command { name    = "say"
-        , state   = Active
-        , auth    = [ACL_N]
-        , usage   = ">>= say "
-        , desc    = "repeat a phrase"
-        , trigger = [WordPresent "say"]
-        , action  = [Respond Privmsg [AllWordsAfter "say"] To_Current ] }
-
---
--- Turn on logging by channel
---
-Command { name    = ""
-        , state   = Always
-        , auth    = [ACL_N]
-        , usage   = ""
-        , desc    = ""
-        , trigger = [AllMessages]
-        , action  = [ LogToFile [Channel] [AllFields]
-                    , LogToFile [Channel] [WholeMessage] ]}
-
-Command { name    = "PayloadAquire"
-        , state   = Active
-        , auth    = []
-        , usage   = ">>= cannon load [commands]"
-        , desc    = "load the cannons with commands"
-        , trigger = [FollowedBy "cannon" "load"]
-        , action  = [ LoadCannons 
-                    , Respond Notice [Literal "IonCannons are Heating up"] To_Current ]}
-
-Command { name    = "PayloadFire"
-        , state   = Active
-        , auth    = []
-        , usage   = ">>= cannon fire"
-        , desc    = "Fire the payload / Execute the commands"
-        , trigger = [ FollowedBy "cannon" "fire" ]
-        , action  = [ Respond Notice [Literal "Firing For Effect"] To_Current
-                    , FireCannons
-                    , Respond Notice [Literal "We Have Contact"] To_Current ]}
-
-Command { name    = "PayloadFirex3"
-        , state   = Active
-        , auth    = []
-        , usage   = ">>= cannon fire3"
-        , desc    = "Fire the payload three times"
-        , trigger = [ FollowedBy "cannon" "fire3" ]
-        , action  = [ FireCannons, FireCannons, FireCannons ]}
-
-Command { name    = "PayloadCheck"
-        , state   = Active
-        , auth    = []
-        , usage   = ">>= cannon check"
-        , desc    = "list the commands currently stored in the cannons"
-        , trigger = [ FollowedBy "cannon" "check" ]
-        , action  = [ CheckCannons ]}
 
 Command { name    = "help"
         , state   = Active
@@ -171,3 +113,4 @@ Command { name    = "source"
         , desc    = "Display the URL to the sourceCode"
         , trigger = [ FirstWord "source" ]
         , action  = [ Respond Privmsg [Literal "My source is at:", SourceUrl] To_Current ]}
+
