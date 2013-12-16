@@ -1,0 +1,173 @@
+-- This File outlines the commands that the bot will use during operation
+-- You may reload these commands by telling the bot to 'reload'
+-- Comented lines begin with a '--'
+
+--
+-- Reload all of the commands in this file
+-- (This is probably the most important command)
+--
+Command { name    = "reload"
+        , state   = Active
+        , auth    = []
+        , usage   = ">>= reload"
+        , desc    = "reload all commands from file"
+        , trigger = [WordPresent "reload"]
+        , action  = [ReloadCommands] }
+
+--
+-- Have the bot join channel
+--
+Command { name    = "join"
+        , state   = Active
+        , auth    = []
+        , usage   = ">>= join <channel>"
+        , desc    = "join a channel"
+        , trigger = [WordPresent "join"]
+        , action  = [Respond Join [AllWordsAfter "join"] To_Server ] }
+
+--
+-- Have the bot leave the curent channel
+--
+Command { name    = "leave"
+        , state   = Active
+        , auth    = []
+        , usage   = ">>= leave <channel>"
+        , desc    = "leave a channel"
+        , trigger = [WordPresent "leave"]
+        , action  = [Respond Part [Channel] To_Server ] }
+
+--
+-- Have the bot leave a channel
+--
+Command { name    = "quit"
+        , state   = Active
+        , auth    = []
+        , usage   = ">>= quit"
+        , desc    = "leave a channel"
+        , trigger = [WordPresent "quit"]
+        , action  = [Respond Quit [AllWordsAfter "quit"] To_Server ] }
+
+--
+-- Have the bot leave a channel
+--
+Command { name    = "part"
+        , state   = Active
+        , auth    = []
+        , usage   = ">>=  part <channel>"
+        , desc    = "leave a channel"
+        , trigger = [WordPresent "part"]
+        , action  = [Respond Part [WordAfter "part"] To_Server ] }
+
+--
+-- Simply have the bot repeat everything after the word 'say'
+--
+Command { name    = "say"
+        , state   = Active
+        , auth    = [ACL_N]
+        , usage   = ">>= say "
+        , desc    = "repeat a phrase"
+        , trigger = [WordPresent "say"]
+        , action  = [Respond Privmsg [AllWordsAfter "say"] To_Current ] }
+
+--
+-- Turn on logging by channel
+--
+Command { name    = ""
+        , state   = Always
+        , auth    = [ACL_N]
+        , usage   = ""
+        , desc    = ""
+        , trigger = [AllMessages]
+        , action  = [ LogToFile [Channel] [AllFields]
+                    , LogToFile [Channel] [WholeMessage] ]}
+
+Command { name    = "PayloadAquire"
+        , state   = Active
+        , auth    = []
+        , usage   = ">>= cannon load [commands]"
+        , desc    = "load the cannons with commands"
+        , trigger = [FollowedBy "cannon" "load"]
+        , action  = [ LoadCannons 
+                    , Respond Notice [Literal "IonCannons are Heating up"] To_Current ]}
+
+Command { name    = "PayloadFire"
+        , state   = Active
+        , auth    = []
+        , usage   = ">>= cannon fire"
+        , desc    = "Fire the payload / Execute the commands"
+        , trigger = [ FollowedBy "cannon" "fire" ]
+        , action  = [ Respond Notice [Literal "Firing For Effect"] To_Current
+                    , FireCannons
+                    , Respond Notice [Literal "We Have Contact"] To_Current ]}
+
+Command { name    = "PayloadFirex3"
+        , state   = Active
+        , auth    = []
+        , usage   = ">>= cannon fire3"
+        , desc    = "Fire the payload three times"
+        , trigger = [ FollowedBy "cannon" "fire3" ]
+        , action  = [ FireCannons, FireCannons, FireCannons ]}
+
+Command { name    = "PayloadCheck"
+        , state   = Active
+        , auth    = []
+        , usage   = ">>= cannon check"
+        , desc    = "list the commands currently stored in the cannons"
+        , trigger = [ FollowedBy "cannon" "check" ]
+        , action  = [ CheckCannons ]}
+
+Command { name    = "help"
+        , state   = Active
+        , auth    = [ACL_N]
+        , usage   = ">>= help"
+        , desc    = "Display usage information"
+        , trigger = [ FirstWord "help" ]
+        , action  = [ HelpUsageList ]}
+
+Command { name    = "helpall"
+        , state   = Active
+        , auth    = []
+        , usage   = ">>= helpall"
+        , desc    = "Display all usage information"
+        , trigger = [ FirstWord "helpall" ]
+        , action  = [ HelpUsageListAll ]}
+
+Command { name    = "list"
+        , state   = Active
+        , auth    = [ACL_N]
+        , usage   = ">>= list"
+        , desc    = "List possible commands"
+        , trigger = [ FirstWord "list" ]
+        , action  = [ HelpCommandList ] }
+
+Command { name    = "listall"
+        , state   = Active
+        , auth    = []
+        , usage   = ">>= listall"
+        , desc    = "List all commands"
+        , trigger = [ FirstWord "listall" ]
+        , action  = [ HelpCommandListAll ] }
+
+Command { name    = "decribe"
+        , state   = Active
+        , auth    = [ACL_N]
+        , usage   = ">>= describe"
+        , desc    = "Discribe possible commands"
+        , trigger = [ FirstWord "describe" ]
+        , action  = [ HelpDescriptionList ]}
+
+Command { name    = "decribeall"
+        , state   = Active
+        , auth    = []
+        , usage   = ">>= describeall"
+        , desc    = "Discribe all commands"
+        , trigger = [ FirstWord "describeall" ]
+        , action  = [ HelpDescriptionListAll ]}
+
+Command { name    = "source"
+        , state   = Active
+        , auth    = [ACL_N]
+        , usage   = ">>= source"
+        , desc    = "Display the URL to the sourceCode"
+        , trigger = [ FirstWord "source" ]
+        , action  = [ Respond Privmsg [Literal "My source is at:", SourceUrl] To_Current ]}

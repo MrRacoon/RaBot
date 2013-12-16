@@ -1,23 +1,22 @@
 module Driver where
 
-import Authorization
-import Commanding
-import Config
-import Control.Monad
-import Control.Monad.Trans.State
-import Control.Monad.IO.Class
-import Data.List
-import Data.String.Unicode
-import Data.Time.Clock
-import InitialConfig
-import Messaging
-import Network
-import System.Directory
-import System.Exit
-import System.IO
+import Authorization(checkAclList)
+import Commanding(parseCommands)
+import Config(BotConfig(..))
+import Control.Monad.Trans.State(put,get,StateT(..))
+import Control.Monad.IO.Class(liftIO)
+import Data.List(intersperse, (\\))
+import Data.String.Unicode(unicodeToUtf8)
+import Data.Time.Clock(getCurrentTime, diffUTCTime)
+import InitialConfig(initialConfig)
+import Messaging(IRC(..), parse)
+import Network(connectTo, PortID(..))
+import System.Directory(createDirectoryIfMissing)
+import System.Exit(ExitCode(..))
+import System.IO(hSetBuffering, hGetLine, Handle(..), BufferMode(..))
 import System.Process(readProcessWithExitCode)
-import Text.Printf
-import Text.Regex.TDFA
+import Text.Printf(hPrintf, printf)
+import Text.Regex.TDFA((=~))
 import Types
 
 
@@ -30,22 +29,28 @@ type Bot = StateT BotState IO
 -- Main Driver
 -- Performs the initialization of the bot
 --
-drive args = let (BotConfig ni at on ou sv pt ch co lo sc) = resolveArguments initialConfig args
-             in do
-                coms <- readInCommands co
-                h    <- connectTo sv $ PortNumber $ fromInteger $ (read pt :: Integer)
-                let lobs = map (\x -> (x,[])) ch
-                hSetBuffering h NoBuffering
-                write h "NICK" ni
-                write h "USER" (ni++" 0 * :"++on++"'s bot")
-                mapM (write h "JOIN") ch
-                case coms of
-                    Nothing   -> error "Could not parse the command File...Exiting."
-                    Just coms -> runStateT listen $ BotState ni at on ou sv pt lobs coms co sc lo [] h
+drive (BotConfig ni at on ou sv pt ch co lo sc) = do
+  coms <- readInCommands co
+  h    <- connectTo sv $ PortNumber $ fromInteger $ (read pt :: Integer)
+  let lobs = map (\x -> (x,[])) ch
+  hSetBuffering h NoBuffering
+  write h "NICK" ni
+  write h "USER" (ni++" 0 * :"++on++"'s bot")
+  mapM (write h "JOIN") ch
+  case coms of
+    Nothing   -> error "Could not parse the command File...Exiting."
+    Just coms -> runStateT listen $ BotState ni at on ou sv pt lobs coms co sc lo [] h
 
 -- ------------------------------------------------------------------------------------------------------------------
 -- Fileparsing of commands
 -- Read in the commands from the designated file
+
+reloadCommands :: String -> [Command] -> IO (Either [Command] [Command])
+reloadCommands file last = do
+  rel <- readInCommands file
+  return $ case rel of
+             Just new  -> Right new
+             Nothing   -> Left last
 
 readInCommands :: String -> IO (Maybe [Command])
 readInCommands file = do
@@ -53,13 +58,6 @@ readInCommands file = do
     let clean  = map rmComments $ filter (not . null) $ lines file
         cleanr = unwords $ words $ unwords clean
         in return $ getCommands cleanr
-
-reloadCommands :: String -> [Command] -> IO (Either [Command] [Command])
-reloadCommands file last = do
-    rel <- readInCommands file
-    return $ case rel of
-      Just new  -> Right new
-      Nothing   -> Left last
 
 getCommands :: String -> Maybe [Command]
 getCommands = accumulateCommands []
@@ -75,6 +73,12 @@ rmComments []           = []
 rmComments ('-':'-':xs) = []
 rmComments (x:xs)       = x : (rmComments xs)
 
+{-
+reload = do
+  bs <- get
+  ne <- map readInCommands $ commandFile bs
+
+-}
 -- -----------------------------------------------------------------------------------------------------------------
 -- Listen Command that is going to run the bot forever or until completion
 --
@@ -109,7 +113,7 @@ evalCommand (Reload chan)              = do
 evalCommand (Log [loc] line) = do 
       bs <- get
       io $ appendFile ((logsDir bs)++"/"++loc) (line++"\n")
-evalCommand (Log loc   line) = do
+evalCommand (Log loc line) = do
       bs <- get
       let dir  = ((logsDir bs)++) $ concat $ intersperse "/" $ init loc
           file = last loc
@@ -124,8 +128,8 @@ evalCommand (ShowPayload chan) = do
       bs <- get
       let load = payload bs
       case load of
-          []  -> say Privmsg chan "Payload is currently *Empty*"
-          _   -> say Privmsg chan ("Payload contains *"++(show $ length load)++"* items")
+          []  -> say Notice chan "Payload is currently *Empty*"
+          _   -> say Notice chan ("Payload contains *"++(show $ length load)++"* items")
       mapM (say Notice chan . show) load
       return ()
 evalCommand (FirePayload) = do

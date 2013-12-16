@@ -296,6 +296,7 @@ data Authorization = Auth_Nick Nick
 data C_Trigger = AllMessages
                | FirstWord String
                | WordPresent String
+               | FollowedBy String String
                | EntireMessage String
                | EmptyMessage
     deriving (Show,Read,Eq)
