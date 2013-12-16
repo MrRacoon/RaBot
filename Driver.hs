@@ -1,7 +1,6 @@
 module Driver where
 
-import Authorization(checkAclList)
-import Commanding(parseCommands)
+import Commanding(parseCommands, checkAclList)
 import Config(BotConfig(..))
 import Control.Monad.Trans.State(put,get,StateT(..))
 import Control.Monad.IO.Class(liftIO)
@@ -19,12 +18,6 @@ import System.Process(readProcessWithExitCode)
 import Text.Printf(hPrintf, printf)
 import Text.Regex.TDFA((=~))
 import Types
-
-
--- ---------------------------------------------------------------------
--- dataTypes
---
-type Bot = StateT BotState IO
 
 -- -----------------------------------------------------------------------------------------------------------------
 -- Main Driver
@@ -278,28 +271,14 @@ say rt chn mes = do
         Quit    -> hPrintf h "QUIT :%s\r\n" m
         _       -> hPrintf h "%s\r\n" m
 
-notice :: String -> String -> StateT BotState IO b
-notice chn mes = do
-    bs <- get
-    let h = handle bs
-    case chn of
-        [] -> io $ printf "attempted to notify without specifying channel\n"
-        _  -> io $ hPrintf h "NOTICE %s :%s\r\n" chn mes
-
 runScript bin args chan = do
     (ec,out,err) <- io $ readProcessWithExitCode bin args []
     let output = map unwords $ map words $ lines out
         errors = map unwords $ map words $ lines ("ERROR OCCURED:\n"++err)
     case ec of
-        ExitSuccess -> (mapM (say Privmsg chan) output) >> return ()
-        _           -> mapM (say Privmsg chan) errors >> return ()
-
-trimOut x = trimOutput ([],x)
-trimOutput ([],[]) = []
-trimOutput (x,[]) = [x]
-trimOutput ([],x) = trimOutput $ splitAt 60 x
-trimOutput (x,xs) = x : (trimOutput $ splitAt 60 x)
-
+        ExitSuccess -> mapM (say Privmsg chan) output
+        _           -> mapM (say Privmsg chan) errors
+    return ()
 
 io :: IO a -> Bot a
 io = liftIO

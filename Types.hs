@@ -1,10 +1,12 @@
 module Types where
 
 import System.IO(Handle)
+import Control.Monad.Trans.State(StateT(..)) 
 
 -- ------------------------------------------------------------------
 -- Types
 --
+type Bot  = StateT BotState IO
 type Nick = String
 type User = String
 type Host = String
