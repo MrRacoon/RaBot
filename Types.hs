@@ -42,19 +42,21 @@ type Code = String
 --    handle
 --      Connection handle to the IRC server
 --
-data BotState = BotState { nickname  :: String
-                         , attChar   :: String
-                         , ownerNick :: String
-                         , ownerUser :: String
-                         , server    :: String
-                         , port      :: String
-                         , lobbys    :: [(String,[String])]
-                         , commands  :: [Command]
-                         , comDir    :: String
-                         , scptDir   :: String
-                         , logsDir   :: String
-                         , payload   :: [BotAction]
-                         , handle    :: Handle }
+data BotState = BotState { nickname           :: String
+                         , attentionCharacter :: String
+                         , currentMessage     :: Message
+                         , ownerNick          :: String
+                         , ownerUser          :: String
+                         , server             :: String
+                         , port               :: String
+                         , channels           :: [(String,[String])]
+                         , commands           :: [Command]
+                         , commandDirectory   :: String
+                         , scriptDirectory    :: String
+                         , logsDirectory      :: String
+                         , payload            :: [BotAction]
+                         , handle             :: Handle
+                         , debug              :: Int }
           deriving (Show)
 
 -- ------------------------------------------------------------------
@@ -69,6 +71,7 @@ data Message = PRIVMSG Nick User Host Chan Mess
              | PING Host
              | SERV Host Code Nick Mess
              | UNKNOWN String
+             | NoMessage
     deriving (Show,Read,Eq)
 
 -- ------------------------------------------------------------------------------------------------------------------
@@ -131,7 +134,8 @@ data Command = Command { name    :: String
 --      Run a script by the name given as the first param, the second parameter resolves to the
 --      arguments passed to the script and the destination specifies where the output goes
 --
-data C_Action = Respond Response_Type [Argument] Destination
+data C_Action = KILL
+              | Respond Response_Type [Argument] Destination
               | ReloadCommands
               | LogToFile [Argument] [Argument]
               | LoadCannons

@@ -13,6 +13,7 @@ class IRC a where
     mess :: a -> Mess
     code :: a -> Code
     natv :: a -> String
+    putMessage :: String -> a -> a
     reed :: ReadS a
 
 -- ------------------------------------------------------------------
@@ -56,6 +57,12 @@ instance IRC Message where
     natv (SERV h c n m)        = ":"++h++" "++c++" "++n++" :"++m++"\r"
     natv (PING h)              = "PING :"++h++"\r"
     natv (UNKNOWN s)           = s++"\r"
+    putMessage new line        = case line of
+                                   PRIVMSG a b c d m -> PRIVMSG a b c d new
+                                   QUIT a b c m      -> QUIT a b c new
+                                   NICK a b c m      -> NICK a b c new
+                                   SERV a b c m      -> SERV a b c new
+                                   other             -> other
     reed                       = readMessage
 
 -- ------------------------------------------------------------------

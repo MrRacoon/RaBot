@@ -11,6 +11,7 @@ data BotConfig = BotConfig { bot_nickname    :: String
                            , bot_commandFile :: String
                            , bot_logDir      :: String
                            , bot_scriptDir   :: String
+                           , bot_debugLevel  :: Int
                            }
 
 resolveArguments config []                     = config

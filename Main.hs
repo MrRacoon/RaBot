@@ -12,7 +12,7 @@ main = do
       in do
         createDirectoryIfMissing True $ bot_scriptDir conf
         createDirectoryIfMissing True $ bot_logDir conf
---        createDirectoryIfMissing True $ bot_commandFile conf
+        createDirectoryIfMissing True $ bot_commandFile conf
         drive conf
 
 

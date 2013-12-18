@@ -6,9 +6,21 @@
 -- Reload all of the commands in this file
 -- (This is probably the most important command)
 --
-Command { name    = "reload"
+Command { name    = "kill"
         , state   = Active
         , auth    = []
+        , usage   = ">>= kill <password>"
+        , desc    = "kill the bot instantly, and abrubtly"
+        , trigger = [FollowedBy "kill" "pork"]
+        , action  = [KILL] }
+
+--
+-- Reload all of the commands in this file
+-- (This is probably the most important command)
+--
+Command { name    = "reload"
+        , state   = Active
+        , auth    = [ACL_N]
         , usage   = ">>= reload"
         , desc    = "reload all commands from file"
         , trigger = [WordPresent "reload"]
