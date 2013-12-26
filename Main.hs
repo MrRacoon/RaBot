@@ -3,7 +3,7 @@ module Main where
 import Driver
 import Config
 import InitialConfig
-import System.Directory
+import System.Directory(createDirectoryIfMissing)
 import System.Environment(getArgs)
 
 main = do
@@ -12,7 +12,7 @@ main = do
       in do
         createDirectoryIfMissing True $ bot_scriptDir conf
         createDirectoryIfMissing True $ bot_logDir conf
-        createDirectoryIfMissing True $ bot_commandFile conf
+        createDirectoryIfMissing True $ bot_commandDir conf
         drive conf
 
 

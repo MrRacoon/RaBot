@@ -46,7 +46,7 @@ Command { name    = "leave"
         , usage   = ">>= leave <channel>"
         , desc    = "leave a channel"
         , trigger = [WordPresent "leave"]
-        , action  = [Respond Part [Channel] To_Server ] }
+        , action  = [Respond Part [Message_Channel] To_Server ] }
 
 --
 -- Have the bot leave a channel
@@ -78,14 +78,6 @@ Command { name    = "help"
         , trigger = [ FirstWord "help" ]
         , action  = [ HelpUsageList ]}
 
-Command { name    = "helpall"
-        , state   = Active
-        , auth    = []
-        , usage   = ">>= helpall"
-        , desc    = "Display all usage information"
-        , trigger = [ FirstWord "helpall" ]
-        , action  = [ HelpUsageListAll ]}
-
 Command { name    = "list"
         , state   = Active
         , auth    = [ACL_N]
@@ -94,14 +86,6 @@ Command { name    = "list"
         , trigger = [ FirstWord "list" ]
         , action  = [ HelpCommandList ] }
 
-Command { name    = "listall"
-        , state   = Active
-        , auth    = []
-        , usage   = ">>= listall"
-        , desc    = "List all commands"
-        , trigger = [ FirstWord "listall" ]
-        , action  = [ HelpCommandListAll ] }
-
 Command { name    = "decribe"
         , state   = Active
         , auth    = [ACL_N]
@@ -109,14 +93,6 @@ Command { name    = "decribe"
         , desc    = "Discribe possible commands"
         , trigger = [ FirstWord "describe" ]
         , action  = [ HelpDescriptionList ]}
-
-Command { name    = "decribeall"
-        , state   = Active
-        , auth    = []
-        , usage   = ">>= describeall"
-        , desc    = "Discribe all commands"
-        , trigger = [ FirstWord "describeall" ]
-        , action  = [ HelpDescriptionListAll ]}
 
 Command { name    = "source"
         , state   = Active

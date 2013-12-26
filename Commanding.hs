@@ -1,7 +1,6 @@
 module Commanding where
 
 -- ------------------------------------------------------------------------------------------------------------------
-
 import Accessory
 import Control.Monad.Trans.State(get,put)
 import Control.Monad.IO.Class(liftIO)
@@ -12,102 +11,42 @@ import Text.Printf
 import Types
 
 
---makeCommands mes = do
---    bs <- get
---    let always = [SayToTerm (show mes)]
---    return $ always ++ case mes of
---       (PING h)            -> [SayToServer Raw "" ("PONG :"++h), SayToTerm ("PONGED: "++h)]
---       (PRIVMSG a b c d e) -> checkCannonRequest d $ concatMap (tryCommand bs mes) $ commands bs
---       (JOIN a b c d)      -> [UserAdd d a]
---       (PART a b c d)      -> [UserPart d a]
---       (QUIT a b c d)      -> [UserQuit a]
---       (SERV a b c d)      -> interpretServ mes
---       (NICK a b c d)      -> [UserNick a d]
---       _        -> []
---
-----parseCommands :: Message -> [Command] -> Maybe [BotAction]
---parseCommands :: BotState -> Message -> [Command] -> [BotAction]
---parseCommands botState mes com
---     = let always  = [SayToTerm (show mes)]
---       in (always++) $ case mes of
---          (PING h)            -> [SayToServer Raw "" ("PONG :"++h), SayToTerm ("PONGED: "++h)]
---          (PRIVMSG a b c d e) -> checkCannonRequest d $ concatMap (tryCommand botState mes) com
---          (JOIN a b c d)      -> [UserAdd d a]
---          (PART a b c d)      -> [UserPart d a]
---          (QUIT a b c d)      -> [UserQuit a]
---          (SERV a b c d)      -> interpretServ mes
---          (NICK a b c d)      -> [UserNick a d]
---          _        -> []
---
---
---
---interpretServ (SERV a "353" c d) = let (chan:nics) = words d
---                                       list        = words $ tail $ unwords nics
---                                   in map (UserAdd chan) list
---interpretServ _ = []
-
 -- ------------------------------------------------------------------------------------------------------------------
-checkAclList  message list   = any (checkAcl message) list
-checkAcl message acl =
-            case acl of
-               ACL_N         -> True
-               (ACL_W a)     -> authed message a
-               (ACL_M a b)   -> all (authed message) [a,b]
-               (ACL_S a b c) -> all (authed message) [a,b,c]
-               where
-                 authed message (Auth_Nick n) = n == (nick message)
-                 authed message (Auth_User u) = u == (user message)
-                 authed message (Auth_Host h) = h == (host message)
-
--- ------------------------------------------------------------------------------------------------------------------
-
-resolveArg :: Message -> Argument -> String
-resolveArg mes arg =
-    case arg of
-      NULL            -> []
-      Literal s       -> s
-      Nickname        -> nick mes
-      Username        -> user mes
-      FirstChannel    -> (mess mes) =~ "#[^ ]*" :: String
-      Channel         -> chan mes
-      Hostname        -> host mes
-      WholeMessage    -> mess mes
-      AllFields       -> show mes
-      KarmaUP a       -> (++"++") $ resolveArg mes a
-      KarmaDOWN a     -> (++"--") $ resolveArg mes a
-      WordAfter r     -> let (_,_,a) = (mess mes) =~ r :: (String, String, String)
-                             in head $ words a
-      AllWordsAfter r -> let (_,_,a) = (mess mes) =~ r :: (String, String, String)
-                             in drop 1 a
-      SourceUrl       -> "https://github.com/MrRacoon/RaBot.git"
-
--- ------------------------------------------------------------------------------------------------------------------
-
---tryCommand :: BotState -> Message -> Command -> [BotAction]
---tryCommand botState m@(PRIVMSG nic usr hst chn mes) command
---    | copesetic = map (makeAction (PRIVMSG nic usr hst chn messg)) (action command)
---    | otherwise = []
---  where
---    copesetic  = authorized && triggered && stated
---    triggered  = all (trig $ mes) (trigger command)
---    authorized = checkAclList m $ (ACL_M (Auth_Nick $ ownerNick botState) (Auth_User $ ownerUser botState)) : auth command
---    (a,b,c)    = (mes =~ ("(^"++(nickname botState)++"[:]? |^"++(attentionCharacter botState)++" )") :: (String, String, String))
---    st         = not $ null b
---    messg      = if st then c else a
---    stated     = checkState st (state command)
-
+runCommands :: Bot ()
 runCommands = do
     bs <- get
     let c = commands bs
         m = currentMessage bs
+        d = debug bs
         in do
+          io $ debugIt d 1 ("Checking Message:"++(show m))
           s <- preProcess
           case m of
              PING h            -> say Raw "" ("PONG :"++h)
              PRIVMSG _ _ _ _ _ -> mapM (analyzeAndDo s) c >> return ()
+             JOIN n _ _ c      -> addUser c n
+             PART n _ _ c      -> rmUser c n
+             QUIT n _ _ _      -> delUser n
+             SERV _ _ _ _      -> interpretServerMessages
              _                 -> return ()
 
+-- ------------------------------------------------------------------------------------------------------------------
+interpretServerMessages :: Bot ()
+interpretServerMessages = do
+    bs <- get
+    let m = currentMessage bs
+        l = mess m
+        c = code m
+        in case c of
+             "353" -> let (channel,_,names) = (l =~ " :"  :: (String,String,String))
+                          in do mapM (addUser $ concat $ words channel) $ words names
+                                return ()
+             _     -> return ()
 
+-- ------------------------------------------------------------------------------------------------------------------
+--TODO
+-- Ensure that the channel gets changed to the user's nick, if the channel is equal to the bot's nick
+preProcess :: Bot Bool
 preProcess = do
     bs <- get
     let m       = currentMessage bs
@@ -120,7 +59,8 @@ preProcess = do
           put bs { currentMessage = putMessage messg m }
           return st
 
-
+-- ------------------------------------------------------------------------------------------------------------------
+analyzeAndDo :: Bool -> Command -> Bot [()]
 analyzeAndDo st command = do
     bs <- get
     let m          = currentMessage bs
@@ -143,6 +83,8 @@ analyzeAndDo st command = do
                 io $ debugIt d 3 "Command Discarded"
                 return [()]
 
+-- ------------------------------------------------------------------------------------------------------------------
+performAction :: C_Action -> Bot ()
 performAction act = do
     bs <- get
     --io $ putStrLn $ show bs
@@ -153,69 +95,99 @@ performAction act = do
       KILL                    -> let channel = chan m
                                      in do
                                        say Notice channel "KILLSWITCH ENGAGED"
+                                       say Quit channel "KILLSWITCH ENGAGED"
                                        error "KILLSWITCH ENGAGED"
-      Respond rt args dest    -> let response = (unwords . map (resolveArg m)) args
-                                     destin   = makeDestination m dest
-                                     in say rt destin response
+      Respond rt args dest    -> do
+                                 a <- resolveArg' args
+                                 let destin   = makeDestination m dest
+                                     in say rt destin $ unwords a
       ReloadCommands          -> let destin = chan m
                                      in do
                                        (ers,sucs) <- io $ loadCommandDir $ commandDirectory bs
                                        mapM (\(f,c) -> say Notice destin $ ("Loaded: "++f)) sucs
                                        mapM (\(f,e) -> say Notice destin e) ers
                                        put $ bs { commands = (concatMap snd sucs) }
-      LogToFile file args     -> let location = logs ++ "/" ++ (concat $ intersperse "/" $ map (resolveArg m) file)   -- TODO CONCATMAP?
-                                     line     = (++"\n") $ concatMap (resolveArg m) args
-                                     in do
---                                       io $ putStrLn (line ++ "->\n\t" ++ location)
-                                       io $ appendFile location line
-      RunScript bin args dest -> let arguments = concatMap words $ map (resolveArg m) args
+      LogToFile file args     -> do
+                                 a <- resolveArg' file
+                                 b <- resolveArg' args
+                                 let  location = logs ++ "/" ++ (concat $ intersperse "/" a)   -- TODO CONCATMAP?
+                                      line     = (++"\n") $ unwords b
+                                      in do
+                                        io $ appendFile location line
+      RunScript bin args dest -> do
+                                 a <- resolveArg' args
+                                 let arguments = concatMap words $ a
                                      destin    = makeDestination m dest
                                      binary    = scriptDirectory bs ++ "/" ++ bin
                                      in runScript binary arguments destin
-
+      HelpCommandList         -> let coms = (unwords . filter (not . null) . map name . commands) bs
+                                     dest = makeDestination m To_Current
+                                     in say Privmsg dest coms
+      HelpUsageList           -> let coms = (map usage . filter (not . null . name) . commands) bs
+                                     dest = makeDestination m To_Current
+                                     in mapM (say Privmsg dest) coms >> return ()
+      HelpDescriptionList     -> let coms  = (filter (not . null . name) . commands) bs
+                                     names = map name coms
+                                     descs = map desc  coms
+                                     outs  = normalize names descs
+                                     dest  = makeDestination m To_Current
+                                     in mapM (say Privmsg dest) outs >> return ()
 --      RunScript bin args dest -> Script bin (concatMap words $ map (resolveArg mes) args) (makeDestination mes dest)
 --      ShowCurrentUsers        -> ShowUsers (chan mes)
---      HelpCommandList         -> DisplayHelp mes 1 False
---      HelpCommandListAll      -> DisplayHelp mes 1 True
---      HelpUsageList           -> DisplayHelp mes 2 False
---      HelpUsageListAll        -> DisplayHelp mes 2 True
---      HelpDescriptionList     -> DisplayHelp mes 3 False
---      HelpDescriptionListAll  -> DisplayHelp mes 3 True
 --      LoadCannons             -> CannonRequest
 --      CheckCannons            -> ShowPayload (chan mes)
 --      FireCannons             -> FirePayload
 
 -- ------------------------------------------------------------------------------------------------------------------
+resolveArg' :: [Argument] -> Bot [String]
+resolveArg' args = do
+    bs <- get
+    let m   = currentMessage bs
+        f a = case a of
+                NULL                  -> []
+                SourceUrl             -> "https://github.com/MrRacoon/RaBot.git"
+                Literal s             -> s
+                WordAfter r           -> let (_,_,a) = (mess m) =~ r :: (String, String, String)
+                                             in head $ words a
+                AllWordsAfter r       -> let (_,_,a) = (mess m) =~ r :: (String, String, String)
+                                             in drop 1 a
+                FirstChannelMentioned -> (mess m) =~ "#[^ ]*" :: String
+                Message_Nickname      -> nick m
+                Message_Username      -> user m
+                Message_Hostname      -> host m
+                Message_Channel       -> chan m
+                Message_WholeMessage  -> mess m
+                Message_AllFields     -> show m
+                Bot_Nickname          -> nickname bs
+                Bot_OwnerNick         -> ownerNick bs
+                Bot_OwnerUser         -> ownerUser bs
+                Bot_AttChar           -> attentionCharacter bs
+                Bot_Server            -> server bs
+                Bot_Port              -> port bs
+                Bot_Channels          -> unwords $ map fst $ channels bs
+                Bot_CommandCount      -> show $ length $ commands bs
+                Bot_CommandDirectory  -> commandDirectory bs
+                Bot_ScriptDirectory   -> scriptDirectory bs
+                Bot_LogDirectory      -> logsDirectory bs
+                Bot_PayloadCount      -> show $ length $ payload bs
+                Bot_PayloadLoaded     -> show $ not $ null $ payload bs
+                Bot_DebugLevel        -> show $ debug bs
+                _                     -> []
+              in return $ map f args
 
-makeAction :: Message -> C_Action -> BotAction
-makeAction mes act =
-    case act of
-      Respond rt args dest    -> SayToServer rt (makeDestination mes dest) (unwords $ map (resolveArg mes) args)
-      ReloadCommands          -> Reload (chan mes)
-      LogToFile file args     -> Log (map (resolveArg mes) file) (concatMap (resolveArg mes) args)
-      LoadCannons             -> CannonRequest
-      CheckCannons            -> ShowPayload (chan mes)
-      FireCannons             -> FirePayload
-      HelpCommandList         -> DisplayHelp mes 1 False
-      HelpCommandListAll      -> DisplayHelp mes 1 True
-      HelpUsageList           -> DisplayHelp mes 2 False
-      HelpUsageListAll        -> DisplayHelp mes 2 True
-      HelpDescriptionList     -> DisplayHelp mes 3 False
-      HelpDescriptionListAll  -> DisplayHelp mes 3 True
-      ShowCurrentUsers        -> ShowUsers (chan mes)
-      RunScript bin args dest -> Script bin (concatMap words $ map (resolveArg mes) args) (makeDestination mes dest)
-
+-- ------------------------------------------------------------------------------------------------------------------
 loadable com =
     case com of
       SayToServer Privmsg _ _ -> True
       SayToTerm _             -> True
       _                       -> False
 
+-- ------------------------------------------------------------------------------------------------------------------
 checkCannonRequest chan actions
       | CannonRequest `elem` actions    = let (load,rest) = partition loadable actions in (LoadPayload load) : rest 
       | otherwise                       = actions
 
-
+-- ------------------------------------------------------------------------------------------------------------------
 makeDestination :: Message -> Destination -> String
 makeDestination message dest =
     case dest of
@@ -224,7 +196,21 @@ makeDestination message dest =
       To_Channel s   -> s
 
 -- ------------------------------------------------------------------------------------------------------------------
+checkAclList :: Message -> [ACL] -> Bool
+checkAclList  message list   = any (checkAcl message) list
+checkAcl :: Message -> ACL -> Bool
+checkAcl message acl =
+            case acl of
+               ACL_N         -> True
+               (ACL_W a)     -> authed message a
+               (ACL_M a b)   -> all (authed message) [a,b]
+               (ACL_S a b c) -> all (authed message) [a,b,c]
+               where
+                 authed message (Auth_Nick n) = n == (nick message)
+                 authed message (Auth_User u) = u == (user message)
+                 authed message (Auth_Host h) = h == (host message)
 
+-- ------------------------------------------------------------------------------------------------------------------
 checkState :: Bool -> C_State -> Bool
 checkState mst st =
     case (mst,st) of
@@ -235,7 +221,6 @@ checkState mst st =
       _                -> False
 
 -- ------------------------------------------------------------------------------------------------------------------
-
 trig []  EmptyMessage = True
 trig mes trigger =
     case trigger of

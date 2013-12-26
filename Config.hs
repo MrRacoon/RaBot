@@ -8,7 +8,7 @@ data BotConfig = BotConfig { bot_nickname    :: String
                            , bot_server      :: String
                            , bot_port        :: String
                            , bot_chans       :: [String]
-                           , bot_commandFile :: String
+                           , bot_commandDir  :: String
                            , bot_logDir      :: String
                            , bot_scriptDir   :: String
                            , bot_debugLevel  :: Int
@@ -25,8 +25,8 @@ resolveArguments config ("-p":arg:xs)          = resolveArguments (config { bot_
 resolveArguments config ("--port":arg:xs)      = resolveArguments (config { bot_port        = arg }) xs
 resolveArguments config ("-c":arg:xs)          = resolveArguments (config { bot_chans       = bot_chans config ++ [arg] }) xs
 resolveArguments config ("--channel":arg:xs)   = resolveArguments (config { bot_chans       = bot_chans config ++ [arg] }) xs
-resolveArguments config ("-C":arg:xs)          = resolveArguments (config { bot_commandFile = arg }) xs
-resolveArguments config ("--command":arg:xs)   = resolveArguments (config { bot_commandFile = arg }) xs
+resolveArguments config ("-C":arg:xs)          = resolveArguments (config { bot_commandDir  = arg }) xs
+resolveArguments config ("--command":arg:xs)   = resolveArguments (config { bot_commandDir  = arg }) xs
 resolveArguments config ("-L":arg:xs)          = resolveArguments (config { bot_logDir      = arg }) xs
 resolveArguments config ("--log":arg:xs)       = resolveArguments (config { bot_logDir      = arg }) xs
 resolveArguments config ("-S":arg:xs)          = resolveArguments (config { bot_scriptDir   = arg }) xs
@@ -40,17 +40,17 @@ resolveArguments config ("--help":_)           = error programUsage
 resolveArguments _       (x:xs)                = error ("Error: Incorrect Argument: "++x++"\n"++programUsage)
 
 
-programUsage = "usage: rabot [Configuration Parameters]\n" 
-      ++"\t-n Nickname\n"
-      ++"\t-a attentionChar\n"
-      ++"\t-s Server\n"
-      ++"\t-p port\n"
-      ++"\t-c channel\n"
-      ++"\t-C commandFile\n"
-      ++"\t-L logFile\n"
-      ++"\t-S scriptFile\n"
-      ++"\t-N ownerNickname\n"
-      ++"\t-U ownerUsername\n"
-      ++"\t-h help\n"
+programUsage = "usage: rabot [Configuration Parameters]\n\n"
+      ++"\t-n Nickname\n\n"
+      ++"\t-a attentionChar\n\n"
+      ++"\t-s Server\n\n"
+      ++"\t-p port\n\n"
+      ++"\t-c channel\n\n"
+      ++"\t-C commandDirectory\n\n"
+      ++"\t-L logDirectory\n\n"
+      ++"\t-S scriptDirectory\n\n"
+      ++"\t-N ownerNickname\n\n"
+      ++"\t-U ownerUsername\n\n"
+      ++"\t-h help\n\n"
 
 

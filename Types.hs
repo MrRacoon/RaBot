@@ -144,9 +144,6 @@ data C_Action = KILL
               | HelpCommandList
               | HelpUsageList
               | HelpDescriptionList
-              | HelpCommandListAll
-              | HelpUsageListAll
-              | HelpDescriptionListAll
               | ShowCurrentUsers
               | RunScript String [Argument] Destination
     deriving (Show,Read)
@@ -234,19 +231,32 @@ data Response_Type = Privmsg
 --      The whole message struct including all fields
 --
 data Argument = NULL
+              | SourceUrl
               | Literal String
               | WordAfter String
               | AllWordsAfter String
-              | Nickname
-              | Username
-              | FirstChannel
-              | Channel
-              | Hostname
-              | WholeMessage
-              | AllFields
-              | KarmaUP Argument
-              | KarmaDOWN Argument
-              | SourceUrl
+              | FirstChannelMentioned
+              | Message_Nickname
+              | Message_Username
+              | Message_Channel
+              | Message_Hostname
+              | Message_WholeMessage
+              | Message_AllFields
+              | Bot_Nickname
+              | Bot_OwnerNick
+              | Bot_OwnerUser
+              | Bot_AttChar
+              | Bot_Server
+              | Bot_Port
+              | Bot_Channels
+              | Bot_CommandCount
+              | Bot_CommandDirectory
+              | Bot_ScriptDirectory
+              | Bot_LogDirectory
+              | Bot_PayloadCount
+              | Bot_PayloadLoaded
+              | Bot_PayloadList
+              | Bot_DebugLevel
     deriving (Show,Read)
 
 -- ------------------------------------------------------------------------------------------------------------------

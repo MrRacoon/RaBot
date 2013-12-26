@@ -45,7 +45,7 @@ instance IRC Message where
     mess (PRIVMSG _ _ _ _ m)   =  m
     mess (QUIT _ _ _ m)        =  m
     mess (NICK _ _ _ m)        =  m
-    mess (SERV _ _ _ m)        = []
+    mess (SERV _ _ _ m)        =  m
     mess _                     = []
     code (SERV _ c _ _)        =  c
     code _                     = []

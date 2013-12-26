@@ -33,7 +33,7 @@ loadCommandsFromFile file = do
     case rel of
       (f,Right new) -> putStrLn ("Loaded Commands From: "++f) >> (return $ Right (f,new))
       (f, Left err) -> putStrLn (errString err) >> (return $ Left $ (f,errString err))
-  where errString error = "FILE PARSE FAILD: "++file++" on "++(take 30 error)++".."
+  where errString error = "FILE PARSE FAILD: "++file++" on "++(take 99 error)++".."
 
 readInCommands file = do
     files <- readFile file
@@ -55,41 +55,87 @@ accumulateCommands save next = case reads next :: [(Command,String)] of
                                  []        -> Left next
 
 -- ------------------------------------------------------------------------------------------------------------------
-delUser n []     = []
-delUser n ((a,b):xs) = (a,(b \\ [n])) : delUser n xs
 
-rmUser c n [] = []
-rmUser c n ((a,b):xs)
-    | c == a    = (a,(b \\ [n])) : xs
-    | otherwise = (a,b) : rmUser c n xs
+addUser channel name = do
+    io $ putStrLn ("Adding user: "++name++"  to channel: "++channel)
+    bs <- get
+    let ch = channels bs
+        x  = addUser' channel name ch
+        in put bs { channels = x }
+  where
+    addUser' c n []  = [(c,[n])]
+    addUser' c n ((a,b):xs)
+        | c == a     = if elem n b then (a,b) : xs else(a,(n:b)) : xs
+        | otherwise  = (a,b) : (addUser' c n xs)
 
-addUser c n []  = [(c,[n])]
-addUser c n ((a,b):xs)
-    | c == a    = if elem n b then (a,b) : xs else(a,(n:b)) : xs
-    | otherwise = (a,b) : (addUser c n xs)
+delUser name = do
+    io $ putStrLn ("Deleting user: "++name)
+    bs <- get
+    let ch = channels bs
+        x  = delUser' name ch
+        in put bs { channels = x }
+  where
+    delUser' n []     = []
+    delUser' n ((a,b):xs) = (a,(b \\ [n])) : delUser' n xs
 
-getUsers _ []   = []
-getUsers c ((a,b):xs)
-    | a == c    = map unPingafy b
-    | otherwise = getUsers c xs
 
-renameUser o n []         = []
-renameUser o n ((a,b):xs)
-    | o `elem` b = (a, (n:b) \\ [o]) : renameUser o n xs
-    | otherwise  = (a,b) : renameUser o n xs
+rmUser channel name = do
+    io $ putStrLn ("Removing user: "++name++"  from channel: "++channel)
+    bs <- get
+    let ch = channels bs
+        x  = rmUser' channel name ch
+        in put bs { channels = x }
+  where
+    rmUser' c n [] = []
+    rmUser' c n ((a,b):xs)
+        | c == a    = (a,(b \\ [n])) : xs
+        | otherwise = (a,b) : rmUser' c n xs
 
-unPingafy []       = []
-unPingafy ('a':xs) = '@' : unPingafy xs
-unPingafy ('A':xs) = '4' : unPingafy xs
-unPingafy ('e':xs) = '3' : unPingafy xs
-unPingafy ('E':xs) = '3' : unPingafy xs
-unPingafy ('i':xs) = '1' : unPingafy xs
-unPingafy ('I':xs) = '1' : unPingafy xs
-unPingafy ('o':xs) = '0' : unPingafy xs
-unPingafy ('O':xs) = '0' : unPingafy xs
-unPingafy ('l':xs) = '1' : unPingafy xs
-unPingafy ('L':xs) = '1' : unPingafy xs
-unPingafy (x:xs)   = x : unPingafy xs
+
+getUsers channel = do
+    bs <- get
+    let ch = channels bs
+        x  = getUsers' channel ch
+        in return x
+  where
+    getUsers' _ []   = []
+    getUsers' c ((a,b):xs)
+        | a == c    = map unPingafy b
+        | otherwise = getUsers' c xs
+
+renameUser original new = do
+    io $ putStrLn ("Renaming user: "++original++" -> "++new)
+    bs <- get
+    let ch = channels bs
+        x  = renameUser' original new ch
+        in put bs { channels = x }
+  where
+    renameUser' o n []         = []
+    renameUser' o n ((a,b):xs)
+        | o `elem` b = (a, (n:b) \\ [o]) : renameUser' o n xs
+        | otherwise  = (a,b) : renameUser' o n xs
+
+-- ------------------------------------------------------------------------------------------------------------------
+
+
+unPingafy [] = []
+unPingafy (x:xs) = case x of
+                      'a' -> '@' : xs
+                      'A' -> '4' : xs
+                      'e' -> '3' : xs
+                      'E' -> '3' : xs
+                      'i' -> '1' : xs
+                      'I' -> '1' : xs
+                      'o' -> '0' : xs
+                      'O' -> '0' : xs
+                      'l' -> '1' : xs
+                      'L' -> '1' : xs
+                      't' -> '+' : xs
+                      'T' -> '+' : xs
+                      's' -> '$' : xs
+                      'S' -> '$' : xs
+                      'B' -> '|' : '3' : xs
+                      x   ->  x  : unPingafy xs
 
 throttle = io $ do
     t <- getCurrentTime
@@ -98,7 +144,7 @@ throttle' x = do
     t <- getCurrentTime
     let diff = diffUTCTime t x
         res  = show diff
-    case compare diff (fromRational 0.5) of
+    case compare diff (fromRational 1.01) of
          LT -> throttle' x
          _  -> return ()
 
@@ -145,6 +191,10 @@ runScript bin args chan = do
                                   io $ debugIt d 5 err
                                   mapM (say Privmsg chan) errors
                                   return ()
+
+normalize first second = let width = maximum $ map length first
+                             cols  = map (\x -> x ++ (replicate (width - (length x)) ' ') ++ " : ") first
+                             in zipWith (++) cols second
 
 debugIt :: Int -> Int -> String -> IO ()
 debugIt m n s
