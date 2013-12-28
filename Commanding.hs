@@ -132,11 +132,6 @@ performAction act = do
                                      outs  = normalize names descs
                                      dest  = makeDestination m To_Current
                                      in mapM (say Privmsg dest) outs >> return ()
---      RunScript bin args dest -> Script bin (concatMap words $ map (resolveArg mes) args) (makeDestination mes dest)
---      ShowCurrentUsers        -> ShowUsers (chan mes)
---      LoadCannons             -> CannonRequest
---      CheckCannons            -> ShowPayload (chan mes)
---      FireCannons             -> FirePayload
 
 -- ------------------------------------------------------------------------------------------------------------------
 resolveArg' :: [Argument] -> Bot [String]
@@ -174,18 +169,6 @@ resolveArg' args = do
                 Bot_DebugLevel        -> show $ debug bs
                 _                     -> []
               in return $ map f args
-
--- ------------------------------------------------------------------------------------------------------------------
-loadable com =
-    case com of
-      SayToServer Privmsg _ _ -> True
-      SayToTerm _             -> True
-      _                       -> False
-
--- ------------------------------------------------------------------------------------------------------------------
-checkCannonRequest chan actions
-      | CannonRequest `elem` actions    = let (load,rest) = partition loadable actions in (LoadPayload load) : rest 
-      | otherwise                       = actions
 
 -- ------------------------------------------------------------------------------------------------------------------
 makeDestination :: Message -> Destination -> String

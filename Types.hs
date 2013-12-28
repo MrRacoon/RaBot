@@ -54,7 +54,7 @@ data BotState = BotState { nickname           :: String
                          , commandDirectory   :: String
                          , scriptDirectory    :: String
                          , logsDirectory      :: String
-                         , payload            :: [BotAction]
+                         , payload            :: [String]
                          , handle             :: Handle
                          , debug              :: Int }
           deriving (Show)
@@ -147,37 +147,6 @@ data C_Action = KILL
               | ShowCurrentUsers
               | RunScript String [Argument] Destination
     deriving (Show,Read)
-
--- ------------------------------------------------------------------------------------------------------------------
--- The BotActions are what the module will strive to return to the calling program
--- Ready to be interpreted and used
---    SayToServer
---      Send a line ot the server
---    SayToTerm
---      Send some output to the terminal
---    Reload
---      Reload the commands
---    Log
---      Log to a file
---
-data BotAction = Ping String
-               | SayToServer Response_Type String String
-               | SayToTerm String
-               | Reload Chan
-               | Log [String] String
-               | CannonRequest
-               | LoadPayload [BotAction]
-               | ShowPayload String
-               | FirePayload
-               | DisplayHelp Message Int Bool
-               | UserAdd String String
-               | UserQuit String
-               | UserPart String String
-               | UserNick String String
-               | ShowUsers String
-               | Script String [String] String
-               | Not_a_command
-    deriving (Show,Read,Eq)
 
 -- ------------------------------------------------------------------------------------------------------------------
 -- Destination
