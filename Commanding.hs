@@ -101,12 +101,7 @@ performAction act = do
                                  a <- resolveArg' args
                                  let destin   = makeDestination m dest
                                      in say rt destin $ unwords a
-      ReloadCommands          -> let destin = chan m
-                                     in do
-                                       (ers,sucs) <- io $ loadCommandDir $ commandDirectory bs
-                                       mapM (\(f,c) -> say Notice destin $ ("Loaded: "++f)) sucs
-                                       mapM (\(f,e) -> say Notice destin e) ers
-                                       put $ bs { commands = (concatMap snd sucs) }
+      ReloadCommands          -> reloadCommands
       LogToFile file args     -> do
                                  a <- resolveArg' file
                                  b <- resolveArg' args

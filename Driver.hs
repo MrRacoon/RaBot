@@ -25,10 +25,10 @@ import Types
 -- Performs the initialization of the bot
 --
 drive (BotConfig ni at on ou sv pt ch co lo sc dg) = do
-  (errs,suc) <- loadCommandDir co
+  (coms, output) <- loadDirectory co
+  mapM putStrLn output
   h    <- connectTo sv $ PortNumber $ fromInteger $ (read pt :: Integer)
   let lobs = map (\x -> (x,[])) ch
-      coms = concatMap snd suc
       bs   = BotState ni at NoMessage on ou sv pt lobs coms co sc lo [] h dg
   case coms of
     [] -> error "No commands were loaded into the Bot\n"

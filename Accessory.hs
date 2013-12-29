@@ -8,6 +8,7 @@ import Data.List(intersperse, (\\), repeat)
 import Data.String.Unicode(unicodeToUtf8)
 import Data.Time.Clock(getCurrentTime, diffUTCTime)
 import Text.Printf(hPrintf, printf)
+import Messaging
 import Network(connectTo, PortID(..))
 import System.Directory(createDirectoryIfMissing, getDirectoryContents)
 import System.Exit(ExitCode(..))
@@ -17,42 +18,81 @@ import System.Process(readProcessWithExitCode)
 -- ------------------------------------------------------------------------------------------------------------------
 -- Fileparsing of commands
 --
--- Read in the commands from the designated file
+--loadCommandDir path = do
+--    files <- getDirectoryContents path
+--    let comFiles = filter ((=="sh.") . take 3 . reverse ) $ map ((path++"/")++) files
+--        in do
+--          comAttempts <- mapM loadCommandsFromFile comFiles
+--          let r = rights comAttempts
+--              l = lefts comAttempts
+--              in return (l,r)
+--
+--loadCommandsFromFile file = do
+--    rel <- readInCommands file
+--    case rel of
+--      (f,Right new) -> putStrLn ("Loaded Commands From: "++f) >> (return $ Right (f,new))
+--      (f, Left err) -> putStrLn (errString err) >> (return $ Left $ (f,errString err))
+--  where errString error = "FILE PARSE FAILD: "++file++" on "++(take 99 error)++".."
+--
+--readInCommands file = do
+--    files <- readFile file
+--    let clean  = (map rmComments . filter (not . null) . lines) files
+--        cleanr = (unwords . words . unwords) clean
+--        coms   = getCommands cleanr
+--        in return (file, coms)
+--  where
+--    rmComments []           = []
+--    rmComments ('-':'-':xs) = []
+--    rmComments (x:xs)       = x : (rmComments xs)
+--
+--getCommands = accumulateCommands []
+--
+--accumulateCommands save []   = Right []
+--accumulateCommands save next = case reads next :: [(Command,String)] of
+--                                 [(c,[])]  -> Right $ reverse (c:save)
+--                                 [(c,r)]   -> accumulateCommands (c:save) r
+--                                 []        -> Left next
+--
+-- ------------------------------------------------------------------------------------------------------------------
 
-loadCommandDir path = do
-    files <- getDirectoryContents path
-    let comFiles = filter ((=="sh.") . take 3 . reverse ) $ map ((path++"/")++) files
-        in do
-          comAttempts <- mapM loadCommandsFromFile comFiles
-          let r = rights comAttempts
-              l = lefts comAttempts
-              in return (l,r)
+reloadCommands :: StateT BotState IO ()
+reloadCommands = do
+  bs <- get
+  let comDir = commandDirectory bs
+      ch     = chan $ currentMessage bs
+      in do
+        (comms,output) <- io $ loadDirectory comDir
+        put bs { commands = comms }
+        io $ mapM putStrLn output
+        mapM (say Notice ch) output
+        return ()
 
-loadCommandsFromFile file = do
-    rel <- readInCommands file
-    case rel of
-      (f,Right new) -> putStrLn ("Loaded Commands From: "++f) >> (return $ Right (f,new))
-      (f, Left err) -> putStrLn (errString err) >> (return $ Left $ (f,errString err))
-  where errString error = "FILE PARSE FAILD: "++file++" on "++(take 99 error)++".."
-
-readInCommands file = do
-    files <- readFile file
-    let clean  = (map rmComments . filter (not . null) . lines) files
-        cleanr = (unwords . words . unwords) clean
-        coms   = getCommands cleanr
-        in return (file, coms)
+loadDirectory dir = getFiles >>= mapM readinFile . cleanFilePaths >>= return . everything
   where
+    getFiles            = getDirectoryContents dir
+    cleanFilePaths      = map ((dir++"/")++) . filter ((=="sh.") . take 3 . reverse )
+    everything          = foldr1 (\(a,b) (x,y) -> (a++x, b++y)) . map checkLoad
+    checkLoad (f,s,[])  = (s, ["Successfully loaded All Commands from: "++f])
+    checkLoad (f,s,e)   = (s, [ "Error loading from: "++f++" :: "++x | x <- e])
+
+readinFile file = readFile file >>= return . tackFile . (parseFile ([],[]) []) . cleanFileContents
+  where 
+    tackFile (a,b)          = (file,a,b)
+    cleanFileContents       = unwords . map rmComments . filter (not . null) . lines
     rmComments []           = []
     rmComments ('-':'-':xs) = []
     rmComments (x:xs)       = x : (rmComments xs)
 
-getCommands = accumulateCommands []
 
-accumulateCommands save []   = Right []
-accumulateCommands save next = case reads next :: [(Command,String)] of
-                                 [(c,[])]  -> Right $ reverse (c:save)
-                                 [(c,r)]   -> accumulateCommands (c:save) r
-                                 []        -> Left next
+parseFile (corect,failed) curr str =
+  case str of
+    []       -> let f = if null curr then failed else (reverse curr):failed
+                    in (reverse corect, map (unwords . words) $ reverse f)
+    a@(x:xs) -> case reads a of
+                  []      -> parseFile (corect,failed) (x:curr) xs
+                  [(c,r)] -> if null curr 
+                               then parseFile (c:corect, failed) curr r
+                               else parseFile (c:corect, (reverse curr):failed) [] r
 
 -- ------------------------------------------------------------------------------------------------------------------
 
