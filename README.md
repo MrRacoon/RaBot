@@ -8,20 +8,44 @@ The idea is that all of the commands get loaded from the command
 directory at runtime, and can be reloaded at anytime in the bot's
 lifespan. The syntax adheres to typical Haskell syntax.
 
-## Make a Bot in 5 minutes
+## Make a Bot
+
+Use your package manager of choice to install the haskell platform if
+you don't already have it. The platform includes Haskell's awesome
+module manager `cabal` which we'll need later. The following example is
+for use on debian systems. 
+
+`sudo apt-get install haskell-platform`
+
+Now, RaBot requires two modules to run, one for regex, and the other to
+handle Unicode -> utf8. Use `cabal` to install the following packages
+like so.
+
+```bash
+cabal update
+cabal install regex-tdfa
+cabal install hxt-unicode
+```
+
+Now we're set to build RaBot!
 
 Get the source code from GitHub.
+
 `git clone https://github.com/MrRacoon/RaBot`
 
 `cd` into the directory and configure the bot
-```
+
+```bash
 cd RaBot
 cp InitialConfig.hs.Example InitialConfig.hs
 nano InitialConfig.hs
 ```
 compile and go!
-`ghc --make Main.hs -o RaBot`
 
+```bash
+ghc --make Main.hs -o RaBot
+./RaBot
+```
 
 ## Commands
 
@@ -93,12 +117,12 @@ data Authorization
     | Auth_Host String
   deriving (Show,Read,Eq)
 ```
-  * `AUTH_NICK <nickname>`
+  * `AUTH_Nick String`
     * Matches the Nickname of the user from which the message originates
-  * `AUTH_NICK <nickname>`
-    * Matches the Nickname of the user from which the message originates
-  * `AUTH_NICK <nickname>`
-    * Matches the Nickname of the user from which the message originates
+  * `AUTH_User String`
+    * Matches the username of the user from which the message originates
+  * `AUTH_Host String`
+    * Matches the hostname of the user from which the message originates
 
 
 ### Usage
@@ -155,19 +179,19 @@ data C_Action
 ```
 
   * `KILL`
-  * `Respond Response_Type ArgumentList Destination`
+  * `Respond Response_Type [Argument] Destination`
      * Say something in a channel, the message is dictated by the list of args that will concatenate
        and the response will land in the channel specified by the Destination
   * `ReloadCommands`
      * Reload the commands in the command file
-  * `LogToFile ArgumentList ArgumentList`
+  * `LogToFile [Argument] [Argument]`
   * `HelpCommandList`
      * List the commands that can be executed by the issuer
   * `HelpUsageList`
      * List the usages of commands that can be executed by the issuer
   * `HelpDescriptionList`
      * List the descriptions of commands that can be executed by the issuer
-  * `RunScript String ArgumentList Destination`
+  * `RunScript String [Argument] Destination`
      * Run a script by the name given as the first param, the second parameter resolves to the
        arguments passed to the script and the destination specifies where the output goes
 
