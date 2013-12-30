@@ -33,16 +33,10 @@ Get the source code from GitHub.
 
 `git clone https://github.com/MrRacoon/RaBot`
 
-`cd` into the directory and configure the bot
-
-```bash
-cd RaBot
-cp InitialConfig.hs.Example InitialConfig.hs
-nano InitialConfig.hs
-```
 compile and go!
 
 ```bash
+cd RaBot
 ghc --make Main.hs -o RaBot
 ./RaBot
 ```

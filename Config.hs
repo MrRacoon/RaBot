@@ -12,7 +12,34 @@ data BotConfig = BotConfig { bot_nickname    :: String
                            , bot_logDir      :: String
                            , bot_scriptDir   :: String
                            , bot_debugLevel  :: Int
-                           }
+                           } deriving (Show,Read)
+
+makeConfig = do
+  putStrLn "What would you like the name of the Bot to be?:"
+  nick <- getLine
+  putStrLn "What character(s) would you like the bot to respond to, along with its name?:"
+  atc <- getLine
+  putStrLn "What is your nickname on IRC?:"
+  onick <- getLine
+  putStrLn "What is the username you use when connecting to IRC?:"
+  ouser <- getLine
+  putStrLn "What is the IRC server address?:"
+  server <- getLine
+  putStrLn "What port would you like to connect to?:"
+  port <- getLine
+  putStrLn "Which channels would you like the bot to join initially?:"
+  chans <- getLine
+  putStrLn "What Directory would you like the bot to load the command files from?:"
+  cdir <- getLine
+  putStrLn "What directory would you like the bot to put logfiles?:"
+  ldir <- getLine
+  putStrLn "What directory do you keep scripts that you would like the bot to be able to run?:"
+  sdir <- getLine
+  putStrLn "Between 1-10, how much debugging output would you like to see?:"
+  debug <- getLine
+  let config = BotConfig nick atc onick ouser server port (words chans) cdir ldir sdir (read debug)
+  writeFile "InitialConfig" $ show config
+  return config
 
 resolveArguments config []                     = config
 resolveArguments config ("-n":arg:xs)          = resolveArguments (config { bot_nickname    = arg }) xs
@@ -52,5 +79,11 @@ programUsage = "usage: rabot [Configuration Parameters]\n\n"
       ++"\t-N ownerNickname\n\n"
       ++"\t-U ownerUsername\n\n"
       ++"\t-h help\n\n"
+
+
+
+
+
+
 
 

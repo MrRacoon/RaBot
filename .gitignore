@@ -1,4 +1,4 @@
-InitialConfig.hs
+InitialConfig
 Secrets.hs
 Commands.hs
 logs/*
