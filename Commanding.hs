@@ -3,11 +3,11 @@ module Commanding where
 -- ------------------------------------------------------------------------------------------------------------------
 import Accessory
 import Control.Monad.Trans.State(get,put)
-import Control.Monad.IO.Class(liftIO)
-import Data.List(partition, intersperse)
+import Control.Monad(void)
+--import Control.Monad.IO.Class(liftIO)
+import Data.List(intercalate)
 import Messaging(IRC(..))
 import Text.Regex.TDFA((=~))
-import Text.Printf
 import Types
 
 
@@ -15,19 +15,19 @@ import Types
 runCommands :: Bot ()
 runCommands = do
     bs <- get
-    let c = commands bs
+    let coms = commands bs
         m = currentMessage bs
         d = debug bs
         in do
-          io $ debugIt d 1 ("Checking Message:"++(show m))
+          io $ debugIt d 1 ("Checking Message:" ++ show m)
           s <- preProcess
           case m of
              PING h            -> say Raw "" ("PONG :"++h)
-             PRIVMSG _ _ _ _ _ -> mapM (analyzeAndDo s) c >> return ()
+             PRIVMSG {}        -> void (mapM (analyzeAndDo s) coms)
              JOIN n _ _ c      -> addUser c n
              PART n _ _ c      -> rmUser c n
              QUIT n _ _ _      -> delUser n
-             SERV _ _ _ _      -> interpretServerMessages
+             SERV {}           -> interpretServerMessages
              _                 -> return ()
 
 -- ------------------------------------------------------------------------------------------------------------------
@@ -39,7 +39,7 @@ interpretServerMessages = do
         c = code m
         in case c of
              "353" -> let (channel,_,names) = (l =~ " :"  :: (String,String,String))
-                          in do mapM (addUser $ concat $ words channel) $ words names
+                          in do mapM_ (addUser $ concat $ words channel) $ words names
                                 return ()
              _     -> return ()
 
@@ -65,19 +65,19 @@ analyzeAndDo st command = do
     bs <- get
     let m          = currentMessage bs
         d          = debug bs
-        authorized = checkAclList m $ (ACL_M (Auth_Nick $ ownerNick bs) (Auth_User $ ownerUser bs)) : auth command
+        authorized = checkAclList m $ ACL_M (Auth_Nick $ ownerNick bs) (Auth_User $ ownerUser bs) : auth command
         triggered  = all (trig $ mess m) (trigger command)
         stated     = checkState st (state command)
         in do
-          io $ debugIt d 1 $ "\nChecking Command: "++(show $ name command)
-          io $ debugIt d 2 $ "Message   : "++ (show $ m)
-          io $ debugIt d 2 $ "Authed    : "++ (show authorized)
-          io $ debugIt d 2 $ "Triggered : "++ (show triggered)
-          io $ debugIt d 2 $ "Stated    : "++ (show stated)
+          io $ debugIt d 1 $ "\nChecking Command: " ++ show (name command)
+          io $ debugIt d 2 $ "Message   : " ++ show m
+          io $ debugIt d 2 $ "Authed    : " ++ show authorized
+          io $ debugIt d 2 $ "Triggered : " ++ show triggered
+          io $ debugIt d 2 $ "Stated    : " ++ show stated
           if authorized && triggered && stated
             then do
                 io $ debugIt d 3 "Command Executing"
-                mapM (io . debugIt d 3 . ("\tTriggered: "++) . show) $ action  command
+                mapM_ (io . debugIt d 3 . ("\tTriggered: "++) . show) $ action  command
                 mapM performAction $ action command
             else do
                 io $ debugIt d 3 "Command Discarded"
@@ -89,7 +89,6 @@ performAction act = do
     bs <- get
     --io $ putStrLn $ show bs
     let m = currentMessage bs
-        h = handle bs
         logs = logsDirectory bs
     case act of
       KILL                    -> let channel = chan m
@@ -105,13 +104,12 @@ performAction act = do
       LogToFile file args     -> do
                                  a <- resolveArg' file
                                  b <- resolveArg' args
-                                 let  location = logs ++ "/" ++ (concat $ intersperse "/" a)   -- TODO CONCATMAP?
+                                 let  location = logs ++ "/" ++ intercalate "/" a   -- TODO CONCATMAP?
                                       line     = (++"\n") $ unwords b
-                                      in do
-                                        io $ appendFile location line
+                                      in io $ appendFile location line
       RunScript bin args dest -> do
                                  a <- resolveArg' args
-                                 let arguments = concatMap words $ a
+                                 let arguments = concatMap words a
                                      destin    = makeDestination m dest
                                      binary    = scriptDirectory bs ++ "/" ++ bin
                                      in runScript binary arguments destin
@@ -120,13 +118,13 @@ performAction act = do
                                      in say Privmsg dest coms
       HelpUsageList           -> let coms = (map usage . filter (not . null . name) . commands) bs
                                      dest = makeDestination m To_Current
-                                     in mapM (say Privmsg dest) coms >> return ()
+                                     in void (mapM (say Privmsg dest) coms)
       HelpDescriptionList     -> let coms  = (filter (not . null . name) . commands) bs
                                      names = map name coms
                                      descs = map desc  coms
                                      outs  = normalize names descs
                                      dest  = makeDestination m To_Current
-                                     in mapM (say Privmsg dest) outs >> return ()
+                                     in void (mapM (say Privmsg dest) outs)
 
 -- ------------------------------------------------------------------------------------------------------------------
 resolveArg' :: [Argument] -> Bot [String]
@@ -137,11 +135,11 @@ resolveArg' args = do
                 NULL                  -> []
                 SourceUrl             -> "https://github.com/MrRacoon/RaBot.git"
                 Literal s             -> s
-                WordAfter r           -> let (_,_,a) = (mess m) =~ r :: (String, String, String)
-                                             in head $ words a
-                AllWordsAfter r       -> let (_,_,a) = (mess m) =~ r :: (String, String, String)
-                                             in drop 1 a
-                FirstChannelMentioned -> (mess m) =~ "#[^ ]*" :: String
+                WordAfter r           -> let (_,_,p) = mess m =~ r :: (String, String, String)
+                                             in head $ words p
+                AllWordsAfter r       -> let (_,_,p) = mess m =~ r :: (String, String, String)
+                                             in drop 1 p
+                FirstChannelMentioned -> mess m =~ "#[^ ]*" :: String
                 Message_Nickname      -> nick m
                 Message_Username      -> user m
                 Message_Hostname      -> host m
@@ -175,7 +173,7 @@ makeDestination message dest =
 
 -- ------------------------------------------------------------------------------------------------------------------
 checkAclList :: Message -> [ACL] -> Bool
-checkAclList  message list   = any (checkAcl message) list
+checkAclList  message = any (checkAcl message)
 checkAcl :: Message -> ACL -> Bool
 checkAcl message acl =
             case acl of
@@ -184,9 +182,9 @@ checkAcl message acl =
                (ACL_M a b)   -> all (authed message) [a,b]
                (ACL_S a b c) -> all (authed message) [a,b,c]
                where
-                 authed message (Auth_Nick n) = n == (nick message)
-                 authed message (Auth_User u) = u == (user message)
-                 authed message (Auth_Host h) = h == (host message)
+                 authed message' (Auth_Nick n) = n == nick message'
+                 authed message' (Auth_User u) = u == user message'
+                 authed message' (Auth_Host h) = h == host message'
 
 -- ------------------------------------------------------------------------------------------------------------------
 checkState :: Bool -> C_State -> Bool
@@ -199,9 +197,10 @@ checkState mst st =
       _                -> False
 
 -- ------------------------------------------------------------------------------------------------------------------
+trig :: String -> C_Trigger -> Bool
 trig []  EmptyMessage = True
-trig mes trigger =
-    case trigger of
+trig mes trigger' =
+    case trigger' of
       AllMessages     -> True
       FirstWord x     -> (x==) $ head $ words mes
       WordPresent x   -> x `elem` words mes

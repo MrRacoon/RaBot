@@ -2,17 +2,20 @@ module Main where
 
 import Driver
 import Config
+import Control.Monad(liftM)
 import System.Directory(createDirectoryIfMissing,doesFileExist)
 import System.Environment(getArgs)
+import Types
 
 --main = do
 --  args <- getArgs
 
+main :: IO (a,BotState)
 main = do
     args <- getArgs
     configExist <- doesFileExist "InitialConfig"
     config <- if configExist
-                then readFile "InitialConfig" >>= return . \x -> read x :: BotConfig
+                then liftM (\x -> read x :: BotConfig) (readFile "InitialConfig")
                 else makeConfig
     return config
     let conf = resolveArguments config args

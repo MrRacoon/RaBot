@@ -1,5 +1,6 @@
 module Messaging where
 
+import Control.Monad(liftM)
 import Test.QuickCheck
 import Types
 -- ------------------------------------------------------------------
@@ -58,108 +59,12 @@ instance IRC Message where
     natv (PING h)              = "PING :"++h++"\r"
     natv (UNKNOWN s)           = s++"\r"
     putMessage new line        = case line of
-                                   PRIVMSG a b c d m -> PRIVMSG a b c d new
-                                   QUIT a b c m      -> QUIT a b c new
-                                   NICK a b c m      -> NICK a b c new
-                                   SERV a b c m      -> SERV a b c new
+                                   PRIVMSG a b c d _ -> PRIVMSG a b c d new
+                                   QUIT a b c _      -> QUIT a b c new
+                                   NICK a b c _      -> NICK a b c new
+                                   SERV a b c _      -> SERV a b c new
                                    other             -> other
     reed                       = readMessage
-
--- ------------------------------------------------------------------
--- Parse
--- Takes a Message as a String and converts it into a Message Type
---
-parse :: String -> Message
-parse str = case readMessage str of
-              []    -> UNKNOWN str
-              (x:_) -> fst x
-
-parseList :: String -> [Message]
-parseList []  = []
-parseList str = case readMessage str of
-              ((x,[]):res)  -> x : []
-              ((x,xs):res)  -> x : parseList xs
-              _             -> let [(a,as)] = str `till` '\n' in (UNKNOWN a) : (parseList as)
-
-toSerial :: [Message] -> String
-toSerial = concatMap natv
-
--- ------------------------------------------------------------------
--- readMessage
--- Core Message Conversion Method
---
-readMessage :: ReadS Message
-readMessage s =  [ (PING hst, res)
-                 | ("PING",as)    <- s `till` ' '
-                 , (hst,res)      <- (tail as) `till` '\r']
-              ++ [ (SERV hst cde nic mes, res)
-                 | (":",zs)       <- [splitAt 1 s]
-                 , (hst,as)       <- zs `till` ' '
-                 , (cde,bs)       <- as `till` ' '
-                 , (nic,cs)       <- bs `till` ' '
-                 , (mes,res)      <- (tail cs) `till` '\r'
-                 , (length cde) == 3 ]
-              ++ [ (PRIVMSG nic usr hst chn mes, res)
-                 | (":",zs)       <- [splitAt 1 s]
-                 , (nic,as)       <- zs `till` '!'
-                 , (usr,bs)       <- as `till` '@'
-                 , (hst,cs)       <- bs `till` ' '
-                 , ("PRIVMSG",ds) <- cs `till` ' '
-                 , (chn,es)       <- ds `till` ' '
-                 , (mes,res)      <- (tail es) `till` '\r'
-                 , (length nic) <= 18 ]
-              ++ [ (JOIN nic usr hst chn, res)
-                 | (":",zs)       <- [splitAt 1 s]
-                 , (nic,as)       <- zs `till` '!'
-                 , (usr,bs)       <- as `till` '@'
-                 , (hst,cs)       <- bs `till` ' '
-                 , ("JOIN",ds)    <- cs `till` ' '
-                 , (chn,res)      <- ds `till` '\r'
-                 , (length nic) <= 18 ]
-              ++ [ (PART nic usr hst chn, res)
-                 | (":",zs)       <- [splitAt 1 s]
-                 , (nic,as)       <- zs `till` '!'
-                 , (usr,bs)       <- as `till` '@'
-                 , (hst,cs)       <- bs `till` ' '
-                 , ("PART",ds)    <- cs `till` ' '
-                 , (chn,res)      <- ds `till` '\r'
-                 , (length nic) <= 18 ]
-              ++ [ (QUIT nic usr hst mes, res)
-                 | (":",zs)       <- [splitAt 1 s]
-                 , (nic,as)       <- zs `till` '!'
-                 , (usr,bs)       <- as `till` '@'
-                 , (hst,cs)       <- bs `till` ' '
-                 , ("QUIT",ds)    <- cs `till` ' '
-                 , (mes,res)      <- (tail ds) `till` '\r'
-                 , (length nic) <= 18 ]
-              ++ [ (NICK nic usr hst mes, res)
-                 | (":",zs)       <- [splitAt 1 s]
-                 , (nic,as)       <- zs `till` '!'
-                 , (usr,bs)       <- as `till` '@'
-                 , (hst,cs)       <- bs `till` ' '
-                 , ("NICK",ds)    <- cs `till` ' '
-                 , (mes,res)      <- (tail ds) `till` '\r'
-                 , (length nic) <= 18 ]
-
-till :: Eq a => [a] -> a -> [([a], [a])]
-till [] _         = []
-till xs c         = till' c [] xs
-till' c as []     = []
-till' c as (b:bs)
-    | b == c      = [(reverse as,bs)]
-    | otherwise   = till' c (b:as) bs
-
--- ------------------------------------------------------------------
--- Testing Suite
---
-
-testMessaging' n = testParser' n >> testSerialization' n
-
-testParser    = testParser' 1000
-testParser' n = quickCheckWith stdArgs {maxSuccess = n} ((\x -> (parse $ natv x) == x) :: (Message -> Bool))
-
-testSerialization    = testSerialization' 1000
-testSerialization' n = quickCheckWith stdArgs {maxSuccess = n} ((\x -> (parseList $ toSerial x) == x) :: ([Message] -> Bool))
 
 instance Arbitrary Message where
     arbitrary = do
@@ -181,20 +86,133 @@ instance Arbitrary Message where
         5 -> PING c
         6 -> SERV c f "botsNick" h
 
-letters = (['a'..'z']++['A'..'Z']) :: [Char]
-numbers :: [Char]
+-- ------------------------------------------------------------------
+-- Parse
+-- Takes a Message as a String and converts it into a Message Type
+--
+parse :: String -> Message
+parse str = case readMessage str of
+              []    -> UNKNOWN str
+              (x:_) -> fst x
+
+parseList :: String -> [Message]
+parseList []  = []
+parseList str = case readMessage str of
+              ((x,[]):_)  -> [x]
+              ((x,xs):_)  -> x : parseList xs
+              _             -> let [(a,as)] = str `till` '\n' in UNKNOWN a : parseList as
+
+toSerial :: [Message] -> String
+toSerial = concatMap natv
+
+-- ------------------------------------------------------------------
+-- readMessage
+-- Core Message Conversion Method
+--
+readMessage :: ReadS Message
+readMessage s =  [ (PING hst, res)
+                 | ("PING",as)    <- s `till` ' '
+                 , (hst,res)      <- tail as `till` '\r']
+              ++ [ (SERV hst cde nic mes, res)
+                 | (":",zs)       <- [splitAt 1 s]
+                 , (hst,as)       <- zs `till` ' '
+                 , (cde,bs)       <- as `till` ' '
+                 , (nic,cs)       <- bs `till` ' '
+                 , (mes,res)      <- tail cs `till` '\r'
+                 , length cde == 3 ]
+              ++ [ (PRIVMSG nic usr hst chn mes, res)
+                 | (":",zs)       <- [splitAt 1 s]
+                 , (nic,as)       <- zs `till` '!'
+                 , (usr,bs)       <- as `till` '@'
+                 , (hst,cs)       <- bs `till` ' '
+                 , ("PRIVMSG",ds) <- cs `till` ' '
+                 , (chn,es)       <- ds `till` ' '
+                 , (mes,res)      <- tail es `till` '\r'
+                 , length nic <= 18 ]
+              ++ [ (JOIN nic usr hst chn, res)
+                 | (":",zs)       <- [splitAt 1 s]
+                 , (nic,as)       <- zs `till` '!'
+                 , (usr,bs)       <- as `till` '@'
+                 , (hst,cs)       <- bs `till` ' '
+                 , ("JOIN",ds)    <- cs `till` ' '
+                 , (chn,res)      <- ds `till` '\r'
+                 , length nic <= 18 ]
+              ++ [ (PART nic usr hst chn, res)
+                 | (":",zs)       <- [splitAt 1 s]
+                 , (nic,as)       <- zs `till` '!'
+                 , (usr,bs)       <- as `till` '@'
+                 , (hst,cs)       <- bs `till` ' '
+                 , ("PART",ds)    <- cs `till` ' '
+                 , (chn,res)      <- ds `till` '\r'
+                 , length nic <= 18 ]
+              ++ [ (QUIT nic usr hst mes, res)
+                 | (":",zs)       <- [splitAt 1 s]
+                 , (nic,as)       <- zs `till` '!'
+                 , (usr,bs)       <- as `till` '@'
+                 , (hst,cs)       <- bs `till` ' '
+                 , ("QUIT",ds)    <- cs `till` ' '
+                 , (mes,res)      <- tail ds `till` '\r'
+                 , length nic <= 18 ]
+              ++ [ (NICK nic usr hst mes, res)
+                 | (":",zs)       <- [splitAt 1 s]
+                 , (nic,as)       <- zs `till` '!'
+                 , (usr,bs)       <- as `till` '@'
+                 , (hst,cs)       <- bs `till` ' '
+                 , ("NICK",ds)    <- cs `till` ' '
+                 , (mes,res)      <- tail ds `till` '\r'
+                 , length nic <= 18 ]
+
+till :: Eq a => [a] -> a -> [([a], [a])]
+till [] _         = []
+till xs c         = till' c [] xs
+till' :: Eq a => a -> [a] -> [a] -> [([a], [a])]
+till' _ _ []     = []
+till' c as (b:bs)
+    | b == c      = [(reverse as,bs)]
+    | otherwise   = till' c (b:as) bs
+
+-- ------------------------------------------------------------------
+-- Testing Suite
+--
+
+testMessaging' :: Int -> IO ()
+testMessaging' n = testParser' n >> testSerialization' n
+
+testParser :: IO ()
+testParser    = testParser' 1000
+
+testParser' :: Int -> IO ()
+testParser' n = quickCheckWith stdArgs {maxSuccess = n} ((\x -> parse (natv x) == x) :: (Message -> Bool))
+
+testSerialization :: IO ()
+testSerialization    = testSerialization' 1000
+
+testSerialization' :: Int -> IO ()
+testSerialization' n = quickCheckWith stdArgs {maxSuccess = n} ((\x -> parseList (toSerial x) == x) :: ([Message] -> Bool))
+
+letters :: String
+letters = (['a'..'z']++['A'..'Z']) :: String
+
+numbers :: String
 numbers = ['0'..'9']
 
-randomStringOf = (listOf1 . elements)
+randomStringOf :: [a] -> Gen [a]
+randomStringOf = listOf1 . elements
 
-randomNick     = let possibleCharacters = (letters++numbers++['_','^','-'])
-                 in (randomStringOf possibleCharacters) >>= (return . take 18)
+randomNick :: Gen String
+randomNick     = let possibleCharacters = (letters++numbers++"_^-")
+                 in liftM (take 18) (randomStringOf possibleCharacters)
 
-randomUser     = let possibleFirstLetters = (letters++['_'])
-                     possibleCharacters   = (letters++numbers++['_'])
-                 in (elements possibleFirstLetters) >>= (\a -> (randomStringOf possibleCharacters >>= (\b -> return (a:b))))
+randomUser :: Gen String
+randomUser     = let possibleFirstLetters = (letters++"_")
+                     possibleCharacters   = (letters++numbers++"_")
+                 in elements possibleFirstLetters >>= 
+                      (\a -> 
+                        (randomStringOf possibleCharacters >>= (\b -> return (a:b))))
 
-randomHost     = let possibleCharacters = (letters++numbers++['-'])
+
+randomHost :: Gen String
+randomHost     = let possibleCharacters = (letters++numbers++"-")
                  in do
                     a <- randomStringOf possibleCharacters
                     b <- randomStringOf possibleCharacters
@@ -202,9 +220,11 @@ randomHost     = let possibleCharacters = (letters++numbers++['-'])
                     d <- randomStringOf possibleCharacters
                     return (a++"."++b++"."++c++"."++d)
 
+randomChannel :: Gen String
 randomChannel  = let possibleCharacters = (letters++numbers)
-                 in (listOf $ elements possibleCharacters) >>= (return . ('#':))
+                 in liftM ('#':) (listOf (elements possibleCharacters))
 
+randomCode :: Gen String
 randomCode     = let possibleCharacters = numbers
                  in do
                    a <- elements possibleCharacters
@@ -212,10 +232,13 @@ randomCode     = let possibleCharacters = numbers
                    c <- elements possibleCharacters
                    return [a,b,c]
 
+randomMessage :: Gen String
 randomMessage  = let possibleCharacters = [' '..'~']
-                 in randomStringOf possibleCharacters >>= (return)
+                 in randomStringOf possibleCharacters
 
+randomUnknown :: Gen String
 randomUnknown  = let possibleCharacters = ['\NUL'..]
-                 in (randomStringOf possibleCharacters) >>= return
+                 in randomStringOf possibleCharacters
 
-randomSerial   = (arbitrary :: Gen [Message]) >>= return
+randomSerial :: Gen [Message]
+randomSerial   = arbitrary

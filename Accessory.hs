@@ -1,18 +1,17 @@
 module Accessory where
 
 import Types
+import Control.Monad(liftM)
 import Control.Monad.Trans.State(put,get,StateT(..))
 import Control.Monad.IO.Class(liftIO)
-import Data.Either(lefts,rights)
-import Data.List(intersperse, (\\), repeat)
+import Data.List((\\))
 import Data.String.Unicode(unicodeToUtf8)
 import Data.Time.Clock(getCurrentTime, diffUTCTime)
 import Text.Printf(hPrintf, printf)
 import Messaging
-import Network(connectTo, PortID(..))
-import System.Directory(createDirectoryIfMissing, getDirectoryContents)
+import System.Directory(getDirectoryContents)
 import System.Exit(ExitCode(..))
-import System.IO(hSetBuffering, hGetLine, Handle(..), BufferMode(..))
+import System.IO(Handle)
 import System.Process(readProcessWithExitCode)
 
 -- ------------------------------------------------------------------------------------------------------------------
@@ -64,10 +63,11 @@ reloadCommands = do
         (comms,output) <- io $ loadDirectory comDir
         put bs { commands = comms }
         io $ mapM putStrLn output
-        mapM (say Notice ch) output
+        mapM_ (say Notice ch) output
         return ()
 
-loadDirectory dir = getFiles >>= mapM readinFile . cleanFilePaths >>= return . everything
+loadDirectory :: Read a => String -> IO ([a], [String])
+loadDirectory dir = liftM everything (getFiles >>= mapM readinFile . cleanFilePaths)
   where
     getFiles            = getDirectoryContents dir
     cleanFilePaths      = map ((dir++"/")++) . filter ((=="sh.") . take 3 . reverse )
@@ -75,63 +75,70 @@ loadDirectory dir = getFiles >>= mapM readinFile . cleanFilePaths >>= return . e
     checkLoad (f,s,[])  = (s, ["Successfully loaded All Commands from: "++f])
     checkLoad (f,s,e)   = (s, [ "Error loading from: "++f++" :: "++x | x <- e])
 
-readinFile file = readFile file >>= return . tackFile . (parseFile ([],[]) []) . cleanFileContents
+readinFile :: Read a => FilePath-> IO (FilePath, [a], [String])
+readinFile file = liftM (tackFile . parseFile ([],[]) [] . cleanFileContents) (readFile file)
   where 
     tackFile (a,b)          = (file,a,b)
     cleanFileContents       = unwords . map rmComments . filter (not . null) . lines
     rmComments []           = []
-    rmComments ('-':'-':xs) = []
-    rmComments (x:xs)       = x : (rmComments xs)
+    rmComments ('-':'-':_) = []
+    rmComments (x:xs)       = x : rmComments xs
 
 
+parseFile :: Read a => ([a], [String]) -> String -> String -> ([a], [String])
 parseFile (corect,failed) curr str =
   case str of
-    []       -> let f = if null curr then failed else (reverse curr):failed
+    []       -> let f = if null curr then failed else reverse curr : failed
                     in (reverse corect, map (unwords . words) $ reverse f)
     a@(x:xs) -> case reads a of
                   []      -> parseFile (corect,failed) (x:curr) xs
                   [(c,r)] -> if null curr 
                                then parseFile (c:corect, failed) curr r
-                               else parseFile (c:corect, (reverse curr):failed) [] r
+                               else parseFile (c:corect, reverse curr : failed) [] r
 
 -- ------------------------------------------------------------------------------------------------------------------
 
-addUser channel name = do
-    io $ putStrLn ("Adding user: "++name++"  to channel: "++channel)
+addUser :: String -> String -> StateT BotState IO ()
+addUser channel name' = do
+    io $ putStrLn ("Adding user: "++name'++"  to channel: "++channel)
     bs <- get
     let ch = channels bs
-        x  = addUser' channel name ch
+        x  = addUser' channel name' ch
         in put bs { channels = x }
   where
     addUser' c n []  = [(c,[n])]
     addUser' c n ((a,b):xs)
-        | c == a     = if elem n b then (a,b) : xs else(a,(n:b)) : xs
-        | otherwise  = (a,b) : (addUser' c n xs)
+        | c == a     = if n `elem` b then (a,b) : xs else(a,n:b) : xs
+        | otherwise  = (a,b) : addUser' c n xs
 
-delUser name = do
-    io $ putStrLn ("Deleting user: "++name)
+delUser :: String -> StateT BotState IO ()
+delUser name' = do
+    io $ putStrLn ("Deleting user: "++name')
     bs <- get
     let ch = channels bs
-        x  = delUser' name ch
+        x  = delUser' name' ch
         in put bs { channels = x }
   where
-    delUser' n []     = []
-    delUser' n ((a,b):xs) = (a,(b \\ [n])) : delUser' n xs
+    delUser' _ []     = []
+    delUser' n ((a,b):xs) = (a,b \\ [n]) : delUser' n xs
 
 
-rmUser channel name = do
-    io $ putStrLn ("Removing user: "++name++"  from channel: "++channel)
+rmUser :: String -> String -> StateT BotState IO ()
+rmUser channel name' = do
+    io $ putStrLn ("Removing user: "++name'++"  from channel: "++channel)
     bs <- get
     let ch = channels bs
-        x  = rmUser' channel name ch
+        x  = rmUser' channel name' ch
         in put bs { channels = x }
   where
-    rmUser' c n [] = []
+    rmUser' _ _ [] = []
     rmUser' c n ((a,b):xs)
-        | c == a    = (a,(b \\ [n])) : xs
+        | c == a    = (a,b \\ [n]) : xs
         | otherwise = (a,b) : rmUser' c n xs
 
 
+
+getUsers :: String -> StateT BotState IO [String]
 getUsers channel = do
     bs <- get
     let ch = channels bs
@@ -143,6 +150,7 @@ getUsers channel = do
         | a == c    = map unPingafy b
         | otherwise = getUsers' c xs
 
+renameUser :: String -> String -> StateT BotState IO ()
 renameUser original new = do
     io $ putStrLn ("Renaming user: "++original++" -> "++new)
     bs <- get
@@ -150,7 +158,7 @@ renameUser original new = do
         x  = renameUser' original new ch
         in put bs { channels = x }
   where
-    renameUser' o n []         = []
+    renameUser' _ _ []         = []
     renameUser' o n ((a,b):xs)
         | o `elem` b = (a, (n:b) \\ [o]) : renameUser' o n xs
         | otherwise  = (a,b) : renameUser' o n xs
@@ -158,6 +166,7 @@ renameUser original new = do
 -- ------------------------------------------------------------------------------------------------------------------
 
 
+unPingafy :: String -> String
 unPingafy [] = []
 unPingafy (x:xs) = case x of
                       'a' -> '@' : xs
@@ -175,18 +184,19 @@ unPingafy (x:xs) = case x of
                       's' -> '$' : xs
                       'S' -> '$' : xs
                       'B' -> '|' : '3' : xs
-                      x   ->  x  : unPingafy xs
+                      a   ->  a  : unPingafy xs
 
+throttle :: Bot ()
 throttle = io $ do
     t <- getCurrentTime
     throttle' t
-throttle' x = do
-    t <- getCurrentTime
-    let diff = diffUTCTime t x
-        res  = show diff
-    case compare diff (fromRational 1.01) of
-         LT -> throttle' x
-         _  -> return ()
+  where
+    throttle' x = do
+        t <- getCurrentTime
+        let diff = diffUTCTime t x
+        case compare diff (fromRational 1.01) of
+             LT -> throttle' x
+             _  -> return ()
 
 -- -----------------------------------------------------------------------------------------------------------------
 -- IO funtions
@@ -212,33 +222,35 @@ say rt chn mes = do
         Quit    -> hPrintf h "QUIT :%s\r\n" m
         _       -> hPrintf h "%s\r\n" m
 
-runScript bin args chan = do
+runScript :: String -> [String] -> String -> StateT BotState IO ()
+runScript bin args chan' = do
     bs <- get
     let d = debug bs
         in do
-          io $ debugIt d 4 $ "Running Script: "++bin++" "++(unwords args)
+          io $ debugIt d 4 $ "Running Script: "++bin++" "++unwords args
           (ec,out,err) <- io $ readProcessWithExitCode bin args []
-          let output = map unwords $ map words $ lines out
-              errors = map unwords $ map words $ lines ("ERROR OCCURED:\n"++err)
+          let output = map (unwords . words) (lines out)
+              errors = map (unwords . words) $ lines ("ERROR OCCURED:\n"++err)
               in case ec of
                   ExitSuccess -> do
                                   io $ debugIt d 4 "Success"
                                   io $ debugIt d 5 out
-                                  mapM (say Privmsg chan) output
+                                  mapM_ (say Privmsg chan') output
                                   return ()
                   _           -> do
                                   io $ debugIt d 4 "Failed"
                                   io $ debugIt d 5 err
-                                  mapM (say Privmsg chan) errors
+                                  mapM_ (say Privmsg chan') errors
                                   return ()
 
+normalize :: [String] -> [String] -> [String]
 normalize first second = let width = maximum $ map length first
-                             cols  = map (\x -> x ++ (replicate (width - (length x)) ' ') ++ " : ") first
+                             cols  = map (\x -> x ++ replicate (width - length x) ' ' ++ " : ") first
                              in zipWith (++) cols second
 
 debugIt :: Int -> Int -> String -> IO ()
 debugIt m n s
-    | n <= m = putStrLn $ (++s) $ take n $ repeat '\t'
+    | n <= m = putStrLn $ (++s) $ replicate n '\t'
     | otherwise = return ()
 
 io :: IO a -> Bot a

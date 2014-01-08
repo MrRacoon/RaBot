@@ -14,6 +14,7 @@ data BotConfig = BotConfig { bot_nickname    :: String
                            , bot_debugLevel  :: Int
                            } deriving (Show,Read)
 
+makeConfig :: IO BotConfig
 makeConfig = do
   putStrLn "What would you like the name of the Bot to be?:"
   nick <- getLine
@@ -41,13 +42,14 @@ makeConfig = do
   writeFile "InitialConfig" $ show config
   return config
 
+resolveArguments :: BotConfig -> [String] -> BotConfig
 resolveArguments config []                        = config
 resolveArguments config ("-n":arg:xs)             = resolveArguments (config { bot_nickname    = arg }) xs
 resolveArguments config ("--nick":arg:xs)         = resolveArguments (config { bot_nickname    = arg }) xs
-resolveArguments config ("-pn":arg:xs)            = resolveArguments (config { bot_nickname    = arg++(bot_nickname config) }) xs
-resolveArguments config ("--prepend-nick":arg:xs) = resolveArguments (config { bot_nickname    = arg++(bot_nickname config) }) xs
-resolveArguments config ("-an":arg:xs)            = resolveArguments (config { bot_nickname    = (bot_nickname config)++arg }) xs
-resolveArguments config ("--append-nick":arg:xs)  = resolveArguments (config { bot_nickname    = (bot_nickname config)++arg }) xs
+resolveArguments config ("-pn":arg:xs)            = resolveArguments (config { bot_nickname    = arg++bot_nickname config }) xs
+resolveArguments config ("--prepend-nick":arg:xs) = resolveArguments (config { bot_nickname    = arg++bot_nickname config }) xs
+resolveArguments config ("-an":arg:xs)            = resolveArguments (config { bot_nickname    = bot_nickname config++arg }) xs
+resolveArguments config ("--append-nick":arg:xs)  = resolveArguments (config { bot_nickname    = bot_nickname config++arg }) xs
 resolveArguments config ("-a":arg:xs)             = resolveArguments (config { bot_Char        = arg }) xs
 resolveArguments config ("--att":arg:xs)          = resolveArguments (config { bot_Char        = arg }) xs
 resolveArguments config ("-s":arg:xs)             = resolveArguments (config { bot_server      = arg }) xs
@@ -66,11 +68,12 @@ resolveArguments config ("-N":arg:xs)             = resolveArguments (config { b
 resolveArguments config ("--ownerNick":arg:xs)    = resolveArguments (config { bot_ownerNick   = arg }) xs
 resolveArguments config ("-U":arg:xs)             = resolveArguments (config { bot_ownerUser   = arg }) xs
 resolveArguments config ("--ownerUser":arg:xs)    = resolveArguments (config { bot_ownerUser   = arg }) xs
-resolveArguments config ("-h":_)                  = error programUsage
-resolveArguments config ("--help":_)              = error programUsage
-resolveArguments _       (x:xs)                   = error ("Error: Incorrect Argument: "++x++"\n"++programUsage)
+resolveArguments _      ("-h":_)                  = error programUsage
+resolveArguments _      ("--help":_)              = error programUsage
+resolveArguments _      (x:_)                    = error ("Error: Incorrect Argument: "++x++"\n"++programUsage)
 
 
+programUsage :: String
 programUsage = "usage: rabot [Configuration Parameters]\n\n"
       ++"\t-n Nickname\n\n"
       ++"\t-a attentionChar\n\n"
