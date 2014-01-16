@@ -136,7 +136,7 @@ resolveArg' args = do
                 SourceUrl             -> "https://github.com/MrRacoon/RaBot.git"
                 Literal s             -> s
                 WordAfter r           -> let (_,_,p) = mess m =~ r :: (String, String, String)
-                                             in head $ words p
+                                             in if null p then [] else head $ words p
                 AllWordsAfter r       -> let (_,_,p) = mess m =~ r :: (String, String, String)
                                              in drop 1 p
                 FirstChannelMentioned -> mess m =~ "#[^ ]*" :: String
@@ -202,7 +202,7 @@ trig []  EmptyMessage = True
 trig mes trigger' =
     case trigger' of
       AllMessages     -> True
-      FirstWord x     -> (x==) $ head $ words mes
+      FirstWord x     -> not  (null mes) && ((x==) $ head $ words mes)
       WordPresent x   -> x `elem` words mes
       EntireMessage x -> x == mes
       FollowedBy x y  -> mes =~ (" ?"++x++" "++y++"( |$)") :: Bool
