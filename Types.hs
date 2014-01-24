@@ -279,6 +279,7 @@ data Authorization = Auth_Nick Nick
 --      Some string matching the Regex is present in the message
 --
 data C_Trigger = AllMessages
+               | Anywhere String
                | FirstWord String
                | WordPresent String
                | FollowedBy String String

@@ -4,8 +4,7 @@ module Commanding where
 import Accessory
 import Control.Monad.Trans.State(get,put)
 import Control.Monad(void)
---import Control.Monad.IO.Class(liftIO)
-import Data.List(intercalate)
+import Data.List(intercalate, isInfixOf)
 import Messaging(IRC(..))
 import Text.Regex.TDFA((=~))
 import Types
@@ -202,6 +201,7 @@ trig []  EmptyMessage = True
 trig mes trigger' =
     case trigger' of
       AllMessages     -> True
+      Anywhere x      -> isInfixOf x mes
       FirstWord x     -> not  (null mes) && ((x==) $ head $ words mes)
       WordPresent x   -> x `elem` words mes
       EntireMessage x -> x == mes

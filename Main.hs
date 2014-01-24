@@ -7,9 +7,6 @@ import System.Directory(createDirectoryIfMissing,doesFileExist)
 import System.Environment(getArgs)
 import Types
 
---main = do
---  args <- getArgs
-
 main :: IO (a,BotState)
 main = do
     args <- getArgs

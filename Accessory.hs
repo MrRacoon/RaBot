@@ -81,8 +81,8 @@ readinFile file = liftM (tackFile . parseFile ([],[]) [] . cleanFileContents) (r
     tackFile (a,b)          = (file,a,b)
     cleanFileContents       = unwords . map rmComments . filter (not . null) . lines
     rmComments []           = []
-    rmComments ('-':'-':_) = []
-    rmComments (x:xs)       = x : rmComments xs
+    rmComments ('-':'-':_)  = []
+    rmComments xs           = xs
 
 
 parseFile :: Read a => ([a], [String]) -> String -> String -> ([a], [String])
