@@ -166,6 +166,7 @@ resolveArg' args = do
 makeDestination :: Message -> Destination -> String
 makeDestination message dest =
     case dest of
+      To_User        -> nick message
       To_Current     -> chan message
       To_Server      -> []
       To_Channel s   -> s
@@ -201,7 +202,7 @@ trig []  EmptyMessage = True
 trig mes trigger' =
     case trigger' of
       AllMessages     -> True
-      Anywhere x      -> isInfixOf x mes
+      Anywhere x      -> x `isInfixOf` mes
       FirstWord x     -> not  (null mes) && ((x==) $ head $ words mes)
       WordPresent x   -> x `elem` words mes
       EntireMessage x -> x == mes

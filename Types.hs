@@ -158,6 +158,7 @@ data C_Action = KILL
 --    To_Channel
 --      Send the output to a specified channel (or to a queried nick)
 data Destination = To_Current
+                 | To_User
                  | To_Server
                  | To_Channel String
     deriving (Show,Read)
