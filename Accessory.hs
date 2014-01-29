@@ -198,6 +198,15 @@ throttle = io $ do
              LT -> throttle' x
              _  -> return ()
 
+
+rainbowChars :: [String]
+rainbowChars = (++ rainbowChars) $ map ('\^C':) ["02","03","04","05","06","07","08","09","10","11","12","13"]
+--rainbowChars = map (:"U+005C") $ "EXT02" : "EXT03" : "EXT04" : "EXT05" : "EXT06" : "EXT07" : "EXT08" : "EXT09" : "EXT10" : "EXT11" : "EXT12" : "EXT13" : rainbowChars
+
+rainbowString :: String -> String
+rainbowString = concat . zipWith (\x y -> x ++ [y]) rainbowChars
+
+
 -- -----------------------------------------------------------------------------------------------------------------
 -- IO funtions
 -- Varios functions that perform IO functions including io which lifts IO into the Bot monad

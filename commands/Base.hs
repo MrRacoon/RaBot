@@ -100,5 +100,5 @@ Command { name    = "source"
         , usage   = ">>= source"
         , desc    = "Display the URL to the sourceCode"
         , trigger = [ FirstWord "source" ]
-        , action  = [ Respond Privmsg [Literal "My source is at:", SourceUrl] To_Current ]}
+        , action  = [ Respond Privmsg [Literal "My source is at:", ColorYellow SourceUrl] To_Current ]}
 

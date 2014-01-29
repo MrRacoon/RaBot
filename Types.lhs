@@ -218,6 +218,23 @@ The Arguments Allow us to construct Context Aware Messages that we can output ba
 >               | Message_Hostname
 >               | Message_WholeMessage
 >               | Message_AllFields
+>               | Rainbow Argument
+>               | ColorWhite Argument
+>               | ColorBlack Argument
+>               | ColorBlue Argument
+>               | ColorGreen Argument
+>               | ColorRed Argument
+>               | ColorBrown Argument
+>               | ColorPurple Argument
+>               | ColorOrange Argument
+>               | ColorYellow Argument
+>               | ColorLightGreen Argument
+>               | ColorCyan Argument
+>               | ColorAqua Argument
+>               | ColorLightBlue Argument
+>               | ColorPink Argument
+>               | ColorGrey Argument
+>               | ColorSilver Argument
 >               | Bot_Nickname
 >               | Bot_OwnerNick
 >               | Bot_OwnerUser

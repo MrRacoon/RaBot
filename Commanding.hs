@@ -145,6 +145,23 @@ resolveArg' args = do
                 Message_Channel       -> chan m
                 Message_WholeMessage  -> mess m
                 Message_AllFields     -> show m
+                Rainbow arg           -> rainbowString $ f arg
+                ColorWhite arg        -> "\^C00"++f arg
+                ColorBlack arg        -> "\^C01"++f arg
+                ColorBlue arg         -> "\^C02"++f arg
+                ColorGreen arg        -> "\^C03"++f arg
+                ColorRed arg          -> "\^C04"++f arg
+                ColorBrown arg        -> "\^C05"++f arg
+                ColorPurple arg       -> "\^C06"++f arg
+                ColorOrange arg       -> "\^C07"++f arg
+                ColorYellow arg       -> "\^C08"++f arg
+                ColorLightGreen arg   -> "\^C09"++f arg
+                ColorCyan arg         -> "\^C10"++f arg
+                ColorAqua arg         -> "\^C11"++f arg
+                ColorLightBlue arg    -> "\^C12"++f arg
+                ColorPink arg         -> "\^C13"++f arg
+                ColorGrey arg         -> "\^C14"++f arg
+                ColorSilver arg       -> "\^C15"++f arg
                 Bot_Nickname          -> nickname bs
                 Bot_OwnerNick         -> ownerNick bs
                 Bot_OwnerUser         -> ownerUser bs
