@@ -25,6 +25,7 @@ like so.
 cabal update
 cabal install regex-tdfa
 cabal install hxt-unicode
+cabal install quickcheck 
 ```
 
 Now we're set to build RaBot!
@@ -101,7 +102,7 @@ data ACL
   * `ACL_M Token Token`
     * Medium Security Authorization requiring two tokens
   * `ACL_S Token Token Token`
-    * Strongest Aith requiring three tokens
+    * Strongest Auth requiring three tokens
 
 #### Authorization Token Types
 ```haskell
